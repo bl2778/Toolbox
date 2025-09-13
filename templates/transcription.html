@@ -298,13 +298,15 @@
 
         // Function to monitor transcription status
         async function monitorTranscriptionStatus(taskId) {
-            const maxAttempts = 120; // 4 minutes max (2 seconds interval)
+            const maxAttempts = 300; // 10 minutes max (2 seconds interval)
             let attempts = 0;
 
             const checkStatus = async () => {
                 try {
                     const response = await fetch(`/api/status/${taskId}`);
                     const status = await response.json();
+
+                    console.log('Status update:', status); // Debug log
 
                     if (status.status === 'not_found') {
                         throw new Error('Task not found');
@@ -319,6 +321,7 @@
                     progressText.textContent = status.message || 'Processing...';
                     progressPercent.textContent = `${status.progress || 0}%`;
 
+                    // Check if transcription is completed
                     if (status.status === 'completed') {
                         // Show results
                         currentTaskId = taskId;
@@ -329,41 +332,43 @@
                         transcribeBtn.disabled = false;
 
                         // Calculate processing time
-                        const processingTime = Math.round(status.completion_time - status.start_time);
-                        console.log(`Transcription completed in ${processingTime} seconds`);
+                        if (status.total_time) {
+                            console.log(`Transcription completed in ${Math.round(status.total_time)} seconds`);
+                        }
 
                     } else if (status.status === 'failed' || status.status === 'timeout') {
-                        alert('Transcription failed: ' + status.message);
+                        alert('转写失败: ' + status.message);
                         document.getElementById('progressSection').style.display = 'none';
                         transcribeBtn.disabled = false;
-
-                    } else if (attempts < maxAttempts) {
-                        // Continue monitoring
-                        attempts++;
-                        setTimeout(checkStatus, 2000); // Check every 2 seconds
 
                     } else {
-                        // Timeout
-                        alert('Transcription timeout. Please try again.');
-                        document.getElementById('progressSection').style.display = 'none';
-                        transcribeBtn.disabled = false;
+                        // Continue monitoring for all other statuses (file_reading, file_uploaded, api_uploading, api_uploaded, processing, transcribing)
+                        attempts++;
+                        if (attempts < maxAttempts) {
+                            setTimeout(checkStatus, 2000); // Check every 2 seconds
+                        } else {
+                            // Frontend timeout (shouldn't happen with backend timeout)
+                            alert('前端监控超时，请刷新页面重试');
+                            document.getElementById('progressSection').style.display = 'none';
+                            transcribeBtn.disabled = false;
+                        }
                     }
 
                 } catch (error) {
                     console.error('Status check failed:', error);
+                    attempts++;
                     if (attempts < maxAttempts) {
-                        attempts++;
                         setTimeout(checkStatus, 2000);
                     } else {
-                        alert('Failed to get transcription status. Please try again.');
+                        alert('无法获取转写状态，请刷新页面重试');
                         document.getElementById('progressSection').style.display = 'none';
                         transcribeBtn.disabled = false;
                     }
                 }
             };
 
-            // Start monitoring
-            checkStatus();
+            // Start monitoring immediately
+            setTimeout(checkStatus, 500); // First check after 500ms
         }
 
         // Edit functionality

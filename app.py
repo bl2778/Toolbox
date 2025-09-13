@@ -2,6 +2,7 @@ import os
 import tempfile
 import time
 import uuid
+import threading
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from werkzeug.utils import secure_filename
 import google.generativeai as genai
@@ -71,6 +72,117 @@ def transcription():
         return redirect(url_for('index'))
     return render_template('transcription.html')
 
+def process_transcription_async(task_id, temp_file_path, custom_prompt, file_size, filename):
+    """Async function to handle transcription processing"""
+    try:
+        # Update status - API uploading
+        transcription_status[task_id].update({
+            'status': STATUS_API_UPLOADING,
+            'progress': 30,
+            'message': '正在上传到Gemini API...',
+            'last_update': time.time()
+        })
+
+        # Upload to Gemini
+        model = genai.GenerativeModel("gemini-2.5-pro")
+        audio_file = genai.upload_file(temp_file_path)
+
+        # Update status - API uploaded
+        transcription_status[task_id].update({
+            'status': STATUS_API_UPLOADED,
+            'progress': 50,
+            'message': 'API上传成功，等待处理...',
+            'last_update': time.time()
+        })
+
+        # Wait for file to be processed with timeout
+        processing_start_time = time.time()
+        timeout_seconds = 300  # 5 minutes timeout
+
+        while audio_file.state.name == "PROCESSING":
+            elapsed_time = time.time() - processing_start_time
+
+            # Check for timeout
+            if elapsed_time > timeout_seconds:
+                transcription_status[task_id].update({
+                    'status': STATUS_TIMEOUT,
+                    'message': f'处理超时（超过{timeout_seconds//60}分钟），请重新尝试',
+                    'last_update': time.time()
+                })
+                return
+
+            time.sleep(2)
+            audio_file = genai.get_file(audio_file.name)
+
+            # Update status with timer
+            minutes = int(elapsed_time // 60)
+            seconds = int(elapsed_time % 60)
+            transcription_status[task_id].update({
+                'status': STATUS_PROCESSING,
+                'progress': 60,
+                'message': f'AI正在分析音频文件... 已耗时: {minutes:02d}:{seconds:02d}',
+                'elapsed_time': elapsed_time,
+                'last_update': time.time()
+            })
+
+        if audio_file.state.name == "FAILED":
+            transcription_status[task_id].update({
+                'status': STATUS_FAILED,
+                'message': 'API处理失败，请重试',
+                'last_update': time.time()
+            })
+            return
+
+        # Update status - transcribing
+        transcription_status[task_id].update({
+            'status': STATUS_TRANSCRIBING,
+            'progress': 80,
+            'message': '正在生成转写文本...',
+            'last_update': time.time()
+        })
+
+        # Use custom prompt if provided, otherwise use default
+        default_prompt = "You are a Bain & Company consultant, just had an interview with your client, pls transcribe with timestamp"
+        prompt = custom_prompt if custom_prompt.strip() else default_prompt
+
+        # Generate transcription
+        response = model.generate_content([audio_file, prompt])
+
+        # Update status - completed
+        total_time = time.time() - transcription_status[task_id]['start_time']
+        transcription_status[task_id].update({
+            'status': STATUS_COMPLETED,
+            'progress': 100,
+            'message': f'转写完成！总耗时: {int(total_time//60):02d}:{int(total_time%60):02d}',
+            'transcription': response.text,
+            'prompt_used': prompt,
+            'completion_time': time.time(),
+            'total_time': total_time,
+            'last_update': time.time()
+        })
+
+    except Exception as e:
+        # Update status - failed
+        transcription_status[task_id].update({
+            'status': STATUS_FAILED,
+            'progress': 0,
+            'message': f'处理失败: {str(e)}',
+            'last_update': time.time()
+        })
+    finally:
+        # Clean up temporary file with retry mechanism
+        if temp_file_path and os.path.exists(temp_file_path):
+            max_retries = 5
+            for attempt in range(max_retries):
+                try:
+                    os.unlink(temp_file_path)
+                    break
+                except PermissionError:
+                    if attempt < max_retries - 1:
+                        time.sleep(1)
+                    else:
+                        print(f"Warning: Could not delete temporary file {temp_file_path}")
+
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_audio():
     if not is_authenticated():
@@ -89,7 +201,6 @@ def transcribe_audio():
         # Generate unique task ID
         task_id = str(uuid.uuid4())
 
-        temp_file_path = None
         try:
             # Initialize status tracking
             transcription_status[task_id] = {
@@ -123,100 +234,23 @@ def transcribe_audio():
                 'last_update': time.time()
             })
 
-            # Update status - API uploading
-            transcription_status[task_id].update({
-                'status': STATUS_API_UPLOADING,
-                'progress': 30,
-                'message': '正在上传到Gemini API...',
-                'last_update': time.time()
-            })
+            # Start async processing
+            thread = threading.Thread(
+                target=process_transcription_async,
+                args=(task_id, temp_file_path, custom_prompt, file_size, file.filename)
+            )
+            thread.daemon = True
+            thread.start()
 
-            # Upload to Gemini
-            model = genai.GenerativeModel("gemini-2.5-pro")
-            audio_file = genai.upload_file(temp_file_path)
-
-            # Update status - API uploaded
-            transcription_status[task_id].update({
-                'status': STATUS_API_UPLOADED,
-                'progress': 50,
-                'message': 'API上传成功，等待处理...',
-                'last_update': time.time()
-            })
-
-            # Wait for file to be processed with timeout
-            processing_start_time = time.time()
-            timeout_seconds = 300  # 5 minutes timeout
-
-            while audio_file.state.name == "PROCESSING":
-                elapsed_time = time.time() - processing_start_time
-
-                # Check for timeout
-                if elapsed_time > timeout_seconds:
-                    transcription_status[task_id].update({
-                        'status': STATUS_TIMEOUT,
-                        'message': f'处理超时（超过{timeout_seconds//60}分钟），请重新尝试',
-                        'last_update': time.time()
-                    })
-                    return jsonify({'error': f'Processing timeout after {timeout_seconds//60} minutes', 'task_id': task_id}), 408
-
-                time.sleep(2)
-                audio_file = genai.get_file(audio_file.name)
-
-                # Update status with timer
-                minutes = int(elapsed_time // 60)
-                seconds = int(elapsed_time % 60)
-                transcription_status[task_id].update({
-                    'status': STATUS_PROCESSING,
-                    'progress': 60,
-                    'message': f'AI正在分析音频文件... 已耗时: {minutes:02d}:{seconds:02d}',
-                    'elapsed_time': elapsed_time,
-                    'last_update': time.time()
-                })
-
-            if audio_file.state.name == "FAILED":
-                transcription_status[task_id].update({
-                    'status': 'failed',
-                    'message': 'File processing failed'
-                })
-                return jsonify({'error': 'File processing failed', 'task_id': task_id}), 500
-
-            # Update status - transcribing
-            transcription_status[task_id].update({
-                'status': STATUS_TRANSCRIBING,
-                'progress': 80,
-                'message': '正在生成转写文本...',
-                'last_update': time.time()
-            })
-
-            # Use custom prompt if provided, otherwise use default
-            default_prompt = "You are a Bain & Company consultant, just had an interview with your client, pls transcribe with timestamp"
-            prompt = custom_prompt if custom_prompt.strip() else default_prompt
-
-            # Generate transcription
-            response = model.generate_content([audio_file, prompt])
-
-            # Update status - completed
-            total_time = time.time() - transcription_status[task_id]['start_time']
-            transcription_status[task_id].update({
-                'status': STATUS_COMPLETED,
-                'progress': 100,
-                'message': f'转写完成！总耗时: {int(total_time//60):02d}:{int(total_time%60):02d}',
-                'transcription': response.text,
-                'prompt_used': prompt,
-                'completion_time': time.time(),
-                'total_time': total_time,
-                'last_update': time.time()
-            })
-
+            # Return immediately with task ID
             return jsonify({
-                'success': True,
+                'success': False,  # Processing in background
                 'task_id': task_id,
-                'transcription': response.text,
-                'prompt_used': prompt,
+                'message': 'Processing started',
                 'file_info': {
                     'name': file.filename,
                     'size': file_size,
-                    'processed': True
+                    'processed': False
                 }
             })
 
@@ -230,20 +264,6 @@ def transcribe_audio():
                     'last_update': time.time()
                 })
             return jsonify({'error': f'Transcription failed: {str(e)}', 'task_id': task_id}), 500
-
-        finally:
-            # Clean up temporary file with retry mechanism
-            if temp_file_path and os.path.exists(temp_file_path):
-                max_retries = 5
-                for attempt in range(max_retries):
-                    try:
-                        os.unlink(temp_file_path)
-                        break
-                    except PermissionError:
-                        if attempt < max_retries - 1:
-                            time.sleep(1)
-                        else:
-                            print(f"Warning: Could not delete temporary file {temp_file_path}")
 
     return jsonify({'error': 'Invalid file format'}), 400
 
