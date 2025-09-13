@@ -133,17 +133,41 @@ def process_transcription_async(task_id, temp_file_path, custom_prompt, file_siz
             })
             return
 
-        # Update status - transcribing
+        # Update status - transcribing with initial timer
+        transcribing_start_time = time.time()
+        total_elapsed = transcribing_start_time - transcription_status[task_id]['start_time']
+        minutes = int(total_elapsed // 60)
+        seconds = int(total_elapsed % 60)
+
         transcription_status[task_id].update({
             'status': STATUS_TRANSCRIBING,
             'progress': 80,
-            'message': '正在生成转写文本...',
+            'message': f'正在生成转写文本... 已耗时: {minutes:02d}:{seconds:02d}',
             'last_update': time.time()
         })
 
         # Use custom prompt if provided, otherwise use default
         default_prompt = "You are a Bain & Company consultant, just had an interview with your client, pls transcribe with timestamp"
         prompt = custom_prompt if custom_prompt.strip() else default_prompt
+
+        # Generate transcription with periodic status updates
+        def update_transcribing_status():
+            while transcription_status[task_id]['status'] == STATUS_TRANSCRIBING:
+                current_time = time.time()
+                total_elapsed = current_time - transcription_status[task_id]['start_time']
+                minutes = int(total_elapsed // 60)
+                seconds = int(total_elapsed % 60)
+
+                transcription_status[task_id].update({
+                    'message': f'正在生成转写文本... 已耗时: {minutes:02d}:{seconds:02d}',
+                    'last_update': current_time
+                })
+                time.sleep(2)  # Update every 2 seconds
+
+        # Start timer thread for transcribing phase
+        timer_thread = threading.Thread(target=update_transcribing_status)
+        timer_thread.daemon = True
+        timer_thread.start()
 
         # Generate transcription
         response = model.generate_content([audio_file, prompt])
