@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bain Toolbox - Authentication</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1 class="title">🔧 Bain Toolbox</h1>
+            <p class="subtitle">Please enter the access password to continue</p>
+
+            <form method="POST" action="/auth">
+                <div class="form-group">
+                    <label for="password" class="form-label">Access Password:</label>
+                    <input type="password"
+                           id="password"
+                           name="password"
+                           class="form-input"
+                           placeholder="Enter password"
+                           required
+                           autocomplete="current-password">
+                </div>
+
+                <button type="submit" class="btn">Access Toolbox</button>
+            </form>
+
+            {% if error %}
+                <div class="error">{{ error }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Focus on password field when page loads
+        document.getElementById('password').focus();
+    </script>
+</body>
+</html>

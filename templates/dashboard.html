@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bain Toolbox - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <a href="/logout" class="logout-btn">Logout</a>
+
+    <div class="container">
+        <div class="card">
+            <h1 class="title">🔧 Bain Toolbox</h1>
+            <p class="subtitle">Welcome to your consulting toolkit</p>
+
+            <div class="tool-grid">
+                <div class="tool-card" onclick="location.href='/transcription'">
+                    <div class="tool-icon">🎤</div>
+                    <div class="tool-title">Audio Transcription</div>
+                    <div class="tool-description">
+                        Convert client interview recordings to text with timestamp.
+                        Supports multiple audio formats including MP3, WAV, and M4A.
+                    </div>
+                </div>
+
+                <!-- Future tools can be added here -->
+                <div class="tool-card" style="opacity: 0.5; cursor: not-allowed;">
+                    <div class="tool-icon">✏️</div>
+                    <div class="tool-title">Writing Optimizer</div>
+                    <div class="tool-description">
+                        Improve your consulting writing with AI-powered suggestions.
+                        <br><br><small style="color: #999;">Coming Soon</small>
+                    </div>
+                </div>
+
+                <div class="tool-card" style="opacity: 0.5; cursor: not-allowed;">
+                    <div class="tool-icon">📄</div>
+                    <div class="tool-title">Meeting Summary</div>
+                    <div class="tool-description">
+                        Generate structured meeting notes and action items.
+                        <br><br><small style="color: #999;">Coming Soon</small>
+                    </div>
+                </div>
+
+                <div class="tool-card" style="opacity: 0.5; cursor: not-allowed;">
+                    <div class="tool-icon">🧾</div>
+                    <div class="tool-title">Invoice Processor</div>
+                    <div class="tool-description">
+                        Extract and organize data from invoices and receipts.
+                        <br><br><small style="color: #999;">Coming Soon</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add click animation to available tool cards
+        document.querySelectorAll('.tool-card').forEach(card => {
+            if (!card.style.opacity) {
+                card.addEventListener('mousedown', function() {
+                    this.style.transform = 'translateY(-2px) scale(0.98)';
+                });
+
+                card.addEventListener('mouseup', function() {
+                    this.style.transform = 'translateY(-5px) scale(1)';
+                });
+
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                });
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Transcription - Bain Toolbox</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <a href="/logout" class="logout-btn">Logout</a>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="card">
+            <h1 class="title">🎤 Audio Transcription</h1>
+            <p class="subtitle">Upload your client interview recordings for AI-powered transcription</p>
+
+            <div style="text-align: center; margin-bottom: 20px;">
+                <a href="/dashboard" class="btn" style="display: inline-block; width: auto; background: #6c757d;">
+                    ← Back to Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="card">
+            <h2 style="margin-bottom: 20px; color: #333;">Upload Audio File</h2>
+
+            <!-- File Upload Area -->
+            <div class="file-upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">
+                    <strong>Drag & drop your audio file here</strong><br>
+                    or <strong>click to select</strong>
+                    <br><br>
+                    <small>Supported formats: MP3, WAV, M4A, MP4, WEBM (Max: 100MB)</small>
+                </div>
+                <input type="file" id="fileInput" accept=".mp3,.wav,.m4a,.mp4,.mpeg,.mpga,.webm" style="display: none;">
+            </div>
+
+            <!-- File Information -->
+            <div class="file-info" id="fileInfo" style="display: none;">
+                <strong>Selected File:</strong> <span id="fileName"></span><br>
+                <strong>Size:</strong> <span id="fileSize"></span><br>
+                <strong>Type:</strong> <span id="fileType"></span>
+            </div>
+
+            <!-- Custom Prompt -->
+            <div class="form-group">
+                <label for="customPrompt" class="form-label">Custom Prompt (Optional):</label>
+                <textarea id="customPrompt"
+                          class="form-input"
+                          rows="3"
+                          placeholder="Leave empty to use default: 'You are a Bain & Company consultant, just had an interview with your client, pls transcribe with timestamp'"></textarea>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn" id="transcribeBtn" disabled>
+                    Start Transcription
+                </button>
+                <button type="button" class="btn" id="clearBtn" style="background: #6c757d; width: auto;" onclick="clearFile()">
+                    Clear
+                </button>
+            </div>
+
+            <!-- Progress Bar -->
+            <div id="progressSection" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar"></div>
+                </div>
+                <div id="progressText" style="text-align: center; margin-top: 10px;">Processing...</div>
+                <div id="progressPercent" style="text-align: center; margin-top: 5px; font-weight: bold;">0%</div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="card" id="resultsSection" style="display: none;">
+            <h2 style="margin-bottom: 20px; color: #333;">Transcription Results</h2>
+
+            <div style="margin-bottom: 15px;">
+                <strong>Prompt Used:</strong> <span id="promptUsed"></span>
+            </div>
+
+            <div class="transcription-result" id="transcriptionText"></div>
+
+            <div style="margin-top: 20px; text-align: center;">
+                <button type="button" class="btn" id="copyBtn" onclick="copyToClipboard()">
+                    📋 Copy to Clipboard
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading Section -->
+        <div class="card loading" id="loadingSection" style="display: none;">
+            <div class="spinner"></div>
+            <p>Transcribing your audio file...</p>
+            <p><small>This may take a few minutes depending on file size.</small></p>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        // File upload area elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const transcribeBtn = document.getElementById('transcribeBtn');
+
+        // Handle drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // Handle click to select file
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            // Validate file type
+            const allowedTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/m4a', 'audio/mp4', 'video/mp4', 'audio/webm'];
+            const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.mpeg', '.mpga', '.webm'];
+
+            const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+            if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+                alert('Please select a valid audio file (MP3, WAV, M4A, MP4, WEBM)');
+                return;
+            }
+
+            // Validate file size (100MB)
+            if (file.size > 100 * 1024 * 1024) {
+                alert('File size must be less than 100MB');
+                return;
+            }
+
+            selectedFile = file;
+
+            // Update file info display
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileType').textContent = file.type || 'Unknown';
+
+            fileInfo.style.display = 'block';
+            transcribeBtn.disabled = false;
+
+            // Update upload area appearance
+            uploadArea.innerHTML = `
+                <div class="upload-icon">✅</div>
+                <div class="upload-text">
+                    <strong>File ready for transcription</strong><br>
+                    <small>Click here to select a different file</small>
+                </div>
+                <input type="file" id="fileInput" accept=".mp3,.wav,.m4a,.mp4,.mpeg,.mpga,.webm" style="display: none;">
+            `;
+
+            // Re-attach event listener for new file input
+            document.getElementById('fileInput').addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFile(e.target.files[0]);
+                }
+            });
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            fileInfo.style.display = 'none';
+            transcribeBtn.disabled = true;
+
+            // Reset upload area
+            uploadArea.innerHTML = `
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">
+                    <strong>Drag & drop your audio file here</strong><br>
+                    or <strong>click to select</strong>
+                    <br><br>
+                    <small>Supported formats: MP3, WAV, M4A, MP4, WEBM (Max: 100MB)</small>
+                </div>
+                <input type="file" id="fileInput" accept=".mp3,.wav,.m4a,.mp4,.mpeg,.mpga,.webm" style="display: none;">
+            `;
+
+            // Re-attach event listeners
+            const newFileInput = document.getElementById('fileInput');
+            newFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFile(e.target.files[0]);
+                }
+            });
+
+            // Hide results
+            document.getElementById('resultsSection').style.display = 'none';
+        }
+
+        // Transcribe button click handler
+        document.getElementById('transcribeBtn').addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            const customPrompt = document.getElementById('customPrompt').value.trim();
+
+            // Show progress bar and hide loading/results
+            document.getElementById('progressSection').style.display = 'block';
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'none';
+            transcribeBtn.disabled = true;
+
+            let taskId = null;
+
+            try {
+                const formData = new FormData();
+                formData.append('audio_file', selectedFile);
+                if (customPrompt) {
+                    formData.append('prompt', customPrompt);
+                }
+
+                const response = await fetch('/api/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    taskId = result.task_id;
+
+                    // Show results
+                    document.getElementById('promptUsed').textContent = result.prompt_used;
+                    document.getElementById('transcriptionText').textContent = result.transcription;
+                    document.getElementById('resultsSection').style.display = 'block';
+                    document.getElementById('progressSection').style.display = 'none';
+                } else {
+                    // If we have a task ID, monitor its status
+                    if (result.task_id) {
+                        taskId = result.task_id;
+                        monitorTranscriptionStatus(taskId);
+                    } else {
+                        alert('Transcription failed: ' + result.error);
+                        document.getElementById('progressSection').style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                alert('An error occurred: ' + error.message);
+                document.getElementById('progressSection').style.display = 'none';
+            } finally {
+                if (!taskId) {
+                    transcribeBtn.disabled = false;
+                }
+            }
+        });
+
+        // Function to monitor transcription status
+        async function monitorTranscriptionStatus(taskId) {
+            const maxAttempts = 120; // 4 minutes max (2 seconds interval)
+            let attempts = 0;
+
+            const checkStatus = async () => {
+                try {
+                    const response = await fetch(`/api/status/${taskId}`);
+                    const status = await response.json();
+
+                    if (status.status === 'not_found') {
+                        throw new Error('Task not found');
+                    }
+
+                    // Update progress bar
+                    const progressBar = document.getElementById('progressBar');
+                    const progressText = document.getElementById('progressText');
+                    const progressPercent = document.getElementById('progressPercent');
+
+                    progressBar.style.width = `${status.progress || 0}%`;
+                    progressText.textContent = status.message || 'Processing...';
+                    progressPercent.textContent = `${status.progress || 0}%`;
+
+                    if (status.status === 'completed') {
+                        // Show results
+                        document.getElementById('promptUsed').textContent = status.prompt_used;
+                        document.getElementById('transcriptionText').textContent = status.transcription;
+                        document.getElementById('resultsSection').style.display = 'block';
+                        document.getElementById('progressSection').style.display = 'none';
+                        transcribeBtn.disabled = false;
+
+                        // Calculate processing time
+                        const processingTime = Math.round(status.completion_time - status.start_time);
+                        console.log(`Transcription completed in ${processingTime} seconds`);
+
+                    } else if (status.status === 'failed') {
+                        alert('Transcription failed: ' + status.message);
+                        document.getElementById('progressSection').style.display = 'none';
+                        transcribeBtn.disabled = false;
+
+                    } else if (attempts < maxAttempts) {
+                        // Continue monitoring
+                        attempts++;
+                        setTimeout(checkStatus, 2000); // Check every 2 seconds
+
+                    } else {
+                        // Timeout
+                        alert('Transcription timeout. Please try again.');
+                        document.getElementById('progressSection').style.display = 'none';
+                        transcribeBtn.disabled = false;
+                    }
+
+                } catch (error) {
+                    console.error('Status check failed:', error);
+                    if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(checkStatus, 2000);
+                    } else {
+                        alert('Failed to get transcription status. Please try again.');
+                        document.getElementById('progressSection').style.display = 'none';
+                        transcribeBtn.disabled = false;
+                    }
+                }
+            };
+
+            // Start monitoring
+            checkStatus();
+        }
+
+        function copyToClipboard() {
+            const transcriptionText = document.getElementById('transcriptionText').textContent;
+            navigator.clipboard.writeText(transcriptionText).then(() => {
+                const copyBtn = document.getElementById('copyBtn');
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✅ Copied!';
+                copyBtn.style.background = '#27ae60';
+
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.style.background = '';
+                }, 2000);
+            }).catch(err => {
+                alert('Failed to copy to clipboard');
+            });
+        }
+    </script>
+</body>
+</html>
