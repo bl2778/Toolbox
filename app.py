@@ -16,7 +16,7 @@ app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-here')
 ACCESS_PASSWORD = "BAIN2025"
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'mp3', 'wav', 'm4a', 'mp4', 'mpeg', 'mpga', 'webm'}
-MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB
+MAX_CONTENT_LENGTH = 300 * 1024 * 1024  # 300MB
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
@@ -26,6 +26,17 @@ genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 
 # Store transcription status in memory (in production, use Redis or database)
 transcription_status = {}
+
+# Status constants
+STATUS_FILE_READING = 'file_reading'
+STATUS_FILE_UPLOADED = 'file_uploaded'
+STATUS_API_UPLOADING = 'api_uploading'
+STATUS_API_UPLOADED = 'api_uploaded'
+STATUS_PROCESSING = 'processing'
+STATUS_TRANSCRIBING = 'transcribing'
+STATUS_COMPLETED = 'completed'
+STATUS_FAILED = 'failed'
+STATUS_TIMEOUT = 'timeout'
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -82,11 +93,12 @@ def transcribe_audio():
         try:
             # Initialize status tracking
             transcription_status[task_id] = {
-                'status': 'uploading',
-                'progress': 10,
-                'message': 'Uploading file...',
+                'status': STATUS_FILE_READING,
+                'progress': 5,
+                'message': '文件读取中...',
                 'filename': file.filename,
-                'start_time': time.time()
+                'start_time': time.time(),
+                'last_update': time.time()
             }
 
             # Create a temporary file
@@ -102,30 +114,63 @@ def transcribe_audio():
             # Save uploaded file
             file.save(temp_file_path)
 
-            # Update status
+            # Update status - file uploaded
             transcription_status[task_id].update({
-                'status': 'processing',
+                'status': STATUS_FILE_UPLOADED,
+                'progress': 20,
+                'message': '文件上传成功，准备上传到API...',
+                'file_size': file_size,
+                'last_update': time.time()
+            })
+
+            # Update status - API uploading
+            transcription_status[task_id].update({
+                'status': STATUS_API_UPLOADING,
                 'progress': 30,
-                'message': 'Processing file with Gemini AI...',
-                'file_size': file_size
+                'message': '正在上传到Gemini API...',
+                'last_update': time.time()
             })
 
             # Upload to Gemini
             model = genai.GenerativeModel("gemini-2.5-pro")
             audio_file = genai.upload_file(temp_file_path)
 
-            # Update status
+            # Update status - API uploaded
             transcription_status[task_id].update({
+                'status': STATUS_API_UPLOADED,
                 'progress': 50,
-                'message': 'Waiting for AI processing...'
+                'message': 'API上传成功，等待处理...',
+                'last_update': time.time()
             })
 
-            # Wait for file to be processed
+            # Wait for file to be processed with timeout
+            processing_start_time = time.time()
+            timeout_seconds = 300  # 5 minutes timeout
+
             while audio_file.state.name == "PROCESSING":
+                elapsed_time = time.time() - processing_start_time
+
+                # Check for timeout
+                if elapsed_time > timeout_seconds:
+                    transcription_status[task_id].update({
+                        'status': STATUS_TIMEOUT,
+                        'message': f'处理超时（超过{timeout_seconds//60}分钟），请重新尝试',
+                        'last_update': time.time()
+                    })
+                    return jsonify({'error': f'Processing timeout after {timeout_seconds//60} minutes', 'task_id': task_id}), 408
+
                 time.sleep(2)
                 audio_file = genai.get_file(audio_file.name)
+
+                # Update status with timer
+                minutes = int(elapsed_time // 60)
+                seconds = int(elapsed_time % 60)
                 transcription_status[task_id].update({
-                    'message': 'AI is analyzing your audio file...'
+                    'status': STATUS_PROCESSING,
+                    'progress': 60,
+                    'message': f'AI正在分析音频文件... 已耗时: {minutes:02d}:{seconds:02d}',
+                    'elapsed_time': elapsed_time,
+                    'last_update': time.time()
                 })
 
             if audio_file.state.name == "FAILED":
@@ -135,10 +180,12 @@ def transcribe_audio():
                 })
                 return jsonify({'error': 'File processing failed', 'task_id': task_id}), 500
 
-            # Update status
+            # Update status - transcribing
             transcription_status[task_id].update({
+                'status': STATUS_TRANSCRIBING,
                 'progress': 80,
-                'message': 'Generating transcription...'
+                'message': '正在生成转写文本...',
+                'last_update': time.time()
             })
 
             # Use custom prompt if provided, otherwise use default
@@ -149,13 +196,16 @@ def transcribe_audio():
             response = model.generate_content([audio_file, prompt])
 
             # Update status - completed
+            total_time = time.time() - transcription_status[task_id]['start_time']
             transcription_status[task_id].update({
-                'status': 'completed',
+                'status': STATUS_COMPLETED,
                 'progress': 100,
-                'message': 'Transcription completed successfully!',
+                'message': f'转写完成！总耗时: {int(total_time//60):02d}:{int(total_time%60):02d}',
                 'transcription': response.text,
                 'prompt_used': prompt,
-                'completion_time': time.time()
+                'completion_time': time.time(),
+                'total_time': total_time,
+                'last_update': time.time()
             })
 
             return jsonify({
@@ -174,9 +224,10 @@ def transcribe_audio():
             # Update status - failed
             if task_id in transcription_status:
                 transcription_status[task_id].update({
-                    'status': 'failed',
+                    'status': STATUS_FAILED,
                     'progress': 0,
-                    'message': f'Error: {str(e)}'
+                    'message': f'处理失败: {str(e)}',
+                    'last_update': time.time()
                 })
             return jsonify({'error': f'Transcription failed: {str(e)}', 'task_id': task_id}), 500
 
@@ -203,6 +254,43 @@ def get_transcription_status(task_id):
 
     status = transcription_status.get(task_id, {'status': 'not_found'})
     return jsonify(status)
+
+@app.route('/api/edit/<task_id>', methods=['POST'])
+def edit_transcription(task_id):
+    """Edit the transcription result"""
+    if not is_authenticated():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    if task_id not in transcription_status:
+        return jsonify({'error': 'Task not found'}), 404
+
+    # Check if transcription is completed
+    if transcription_status[task_id]['status'] != STATUS_COMPLETED:
+        return jsonify({'error': 'Transcription not completed'}), 400
+
+    try:
+        data = request.get_json()
+        if not data or 'edited_transcription' not in data:
+            return jsonify({'error': 'Missing edited_transcription field'}), 400
+
+        edited_text = data['edited_transcription'].strip()
+        if not edited_text:
+            return jsonify({'error': 'Edited transcription cannot be empty'}), 400
+
+        # Update the transcription
+        transcription_status[task_id]['transcription'] = edited_text
+        transcription_status[task_id]['edited'] = True
+        transcription_status[task_id]['edit_time'] = time.time()
+        transcription_status[task_id]['last_update'] = time.time()
+
+        return jsonify({
+            'success': True,
+            'message': 'Transcription updated successfully',
+            'transcription': edited_text
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Edit failed: {str(e)}'}), 500
 
 @app.route('/logout')
 def logout():

@@ -33,7 +33,7 @@
                     <strong>Drag & drop your audio file here</strong><br>
                     or <strong>click to select</strong>
                     <br><br>
-                    <small>Supported formats: MP3, WAV, M4A, MP4, WEBM (Max: 100MB)</small>
+                    <small>Supported formats: MP3, WAV, M4A, MP4, WEBM (Max: 300MB)</small>
                 </div>
                 <input type="file" id="fileInput" accept=".mp3,.wav,.m4a,.mp4,.mpeg,.mpga,.webm" style="display: none;">
             </div>
@@ -84,9 +84,23 @@
 
             <div class="transcription-result" id="transcriptionText"></div>
 
-            <div style="margin-top: 20px; text-align: center;">
+            <!-- Edit mode -->
+            <div id="editMode" style="display: none; margin-top: 15px;">
+                <textarea id="editTextarea" class="form-input" rows="15" style="width: 100%; resize: vertical;"></textarea>
+            </div>
+
+            <div style="margin-top: 20px; text-align: center; display: flex; gap: 10px; justify-content: center;">
                 <button type="button" class="btn" id="copyBtn" onclick="copyToClipboard()">
                     📋 Copy to Clipboard
+                </button>
+                <button type="button" class="btn" id="editBtn" onclick="toggleEdit()" style="background: #3498db;">
+                    ✏️ Edit
+                </button>
+                <button type="button" class="btn" id="saveBtn" onclick="saveEdit()" style="background: #27ae60; display: none;">
+                    💾 Save
+                </button>
+                <button type="button" class="btn" id="cancelBtn" onclick="cancelEdit()" style="background: #e74c3c; display: none;">
+                    ❌ Cancel
                 </button>
             </div>
         </div>
@@ -150,9 +164,9 @@
                 return;
             }
 
-            // Validate file size (100MB)
-            if (file.size > 100 * 1024 * 1024) {
-                alert('File size must be less than 100MB');
+            // Validate file size (300MB)
+            if (file.size > 300 * 1024 * 1024) {
+                alert('File size must be less than 300MB');
                 return;
             }
 
@@ -204,7 +218,7 @@
                     <strong>Drag & drop your audio file here</strong><br>
                     or <strong>click to select</strong>
                     <br><br>
-                    <small>Supported formats: MP3, WAV, M4A, MP4, WEBM (Max: 100MB)</small>
+                    <small>Supported formats: MP3, WAV, M4A, MP4, WEBM (Max: 300MB)</small>
                 </div>
                 <input type="file" id="fileInput" accept=".mp3,.wav,.m4a,.mp4,.mpeg,.mpga,.webm" style="display: none;">
             `;
@@ -217,8 +231,12 @@
                 }
             });
 
-            // Hide results
+            // Hide results and reset edit state
             document.getElementById('resultsSection').style.display = 'none';
+            currentTaskId = null;
+            if (isEditing) {
+                cancelEdit();
+            }
         }
 
         // Transcribe button click handler
@@ -251,6 +269,7 @@
 
                 if (result.success) {
                     taskId = result.task_id;
+                    currentTaskId = taskId;
 
                     // Show results
                     document.getElementById('promptUsed').textContent = result.prompt_used;
@@ -302,6 +321,7 @@
 
                     if (status.status === 'completed') {
                         // Show results
+                        currentTaskId = taskId;
                         document.getElementById('promptUsed').textContent = status.prompt_used;
                         document.getElementById('transcriptionText').textContent = status.transcription;
                         document.getElementById('resultsSection').style.display = 'block';
@@ -312,7 +332,7 @@
                         const processingTime = Math.round(status.completion_time - status.start_time);
                         console.log(`Transcription completed in ${processingTime} seconds`);
 
-                    } else if (status.status === 'failed') {
+                    } else if (status.status === 'failed' || status.status === 'timeout') {
                         alert('Transcription failed: ' + status.message);
                         document.getElementById('progressSection').style.display = 'none';
                         transcribeBtn.disabled = false;
@@ -346,9 +366,102 @@
             checkStatus();
         }
 
+        // Edit functionality
+        let currentTaskId = null;
+        let isEditing = false;
+
+        function toggleEdit() {
+            const transcriptionText = document.getElementById('transcriptionText');
+            const editMode = document.getElementById('editMode');
+            const editTextarea = document.getElementById('editTextarea');
+            const editBtn = document.getElementById('editBtn');
+            const saveBtn = document.getElementById('saveBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+
+            if (!isEditing) {
+                // Enter edit mode
+                editTextarea.value = transcriptionText.textContent;
+                transcriptionText.style.display = 'none';
+                editMode.style.display = 'block';
+                editBtn.style.display = 'none';
+                saveBtn.style.display = 'inline-block';
+                cancelBtn.style.display = 'inline-block';
+                isEditing = true;
+            }
+        }
+
+        function cancelEdit() {
+            const transcriptionText = document.getElementById('transcriptionText');
+            const editMode = document.getElementById('editMode');
+            const editBtn = document.getElementById('editBtn');
+            const saveBtn = document.getElementById('saveBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+
+            // Exit edit mode without saving
+            transcriptionText.style.display = 'block';
+            editMode.style.display = 'none';
+            editBtn.style.display = 'inline-block';
+            saveBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
+            isEditing = false;
+        }
+
+        async function saveEdit() {
+            if (!currentTaskId) {
+                alert('No transcription to save');
+                return;
+            }
+
+            const editTextarea = document.getElementById('editTextarea');
+            const editedText = editTextarea.value.trim();
+
+            if (!editedText) {
+                alert('Transcription cannot be empty');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/edit/${currentTaskId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        edited_transcription: editedText
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Update the display
+                    document.getElementById('transcriptionText').textContent = editedText;
+                    cancelEdit(); // Exit edit mode
+
+                    // Show success message
+                    const saveBtn = document.getElementById('saveBtn');
+                    const originalText = saveBtn.textContent;
+                    saveBtn.textContent = '✅ Saved!';
+                    setTimeout(() => {
+                        saveBtn.textContent = originalText;
+                    }, 2000);
+                } else {
+                    alert('Failed to save: ' + result.error);
+                }
+            } catch (error) {
+                alert('An error occurred while saving: ' + error.message);
+            }
+        }
+
         function copyToClipboard() {
-            const transcriptionText = document.getElementById('transcriptionText').textContent;
-            navigator.clipboard.writeText(transcriptionText).then(() => {
+            let textToCopy;
+            if (isEditing) {
+                textToCopy = document.getElementById('editTextarea').value;
+            } else {
+                textToCopy = document.getElementById('transcriptionText').textContent;
+            }
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
                 const copyBtn = document.getElementById('copyBtn');
                 const originalText = copyBtn.textContent;
                 copyBtn.textContent = '✅ Copied!';
