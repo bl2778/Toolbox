@@ -72,7 +72,7 @@ def transcription():
         return redirect(url_for('index'))
     return render_template('transcription.html')
 
-def process_transcription_async(task_id, temp_file_path, custom_prompt, file_size, filename):
+def process_transcription_async(task_id, temp_file_path, custom_prompt, file_size, filename, model_name="gemini-2.5-pro"):
     """Async function to handle transcription processing"""
     try:
         # Update status - API uploading
@@ -84,7 +84,7 @@ def process_transcription_async(task_id, temp_file_path, custom_prompt, file_siz
         })
 
         # Upload to Gemini
-        model = genai.GenerativeModel("gemini-2.5-pro")
+        model = genai.GenerativeModel(model_name)
         audio_file = genai.upload_file(temp_file_path)
 
         # Update status - API uploaded
@@ -217,6 +217,12 @@ def transcribe_audio():
 
     file = request.files['audio_file']
     custom_prompt = request.form.get('prompt', '')
+    selected_model = request.form.get('model', 'gemini-2.5-pro')
+
+    # Validate model selection
+    valid_models = ['gemini-2.5-pro', 'gemini-2.5-flash']
+    if selected_model not in valid_models:
+        return jsonify({'error': f'Invalid model. Must be one of: {", ".join(valid_models)}'}), 400
 
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
@@ -261,7 +267,7 @@ def transcribe_audio():
             # Start async processing
             thread = threading.Thread(
                 target=process_transcription_async,
-                args=(task_id, temp_file_path, custom_prompt, file_size, file.filename)
+                args=(task_id, temp_file_path, custom_prompt, file_size, file.filename, selected_model)
             )
             thread.daemon = True
             thread.start()
