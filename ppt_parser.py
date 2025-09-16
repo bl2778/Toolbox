@@ -23,85 +23,151 @@ class PPTExtractor:
     def __init__(self):
         pass
 
-    def extract_text_recursive(self, shape) -> List[Dict[str, str]]:
+    def extract_text_recursive(self, shape, depth: int = 0, max_depth: int = 10) -> List[Dict[str, str]]:
         """Recursively extract text from a shape (handling groups, tables, charts)."""
         chunks = []
+
+        # Prevent infinite recursion
+        if depth > max_depth:
+            print(f"[WARNING] Max recursion depth reached for shape {shape.shape_id}")
+            return chunks
+
         sid = f"Shape ID {shape.shape_id}"
 
-        # 1) Plain text frames
-        if shape.has_text_frame and shape.text_frame.text.strip():
-            text = shape.text_frame.text.strip()
-            type_hint = "Body"
-            if shape.is_placeholder:
-                ph = shape.placeholder_format
-                if ph.type in {
-                    PP_PLACEHOLDER.TITLE,
-                    PP_PLACEHOLDER.CENTER_TITLE,
-                    PP_PLACEHOLDER.SUBTITLE,
-                    PP_PLACEHOLDER.VERTICAL_TITLE,
-                }:
-                    type_hint = "Title/Subtitle"
-                elif ph.type == PP_PLACEHOLDER.BODY:
-                    type_hint = "Body Placeholder"
-                elif ph.type == PP_PLACEHOLDER.OBJECT and "Title" in shape.name:
-                    type_hint = "Object Title"
+        try:
+            # 1) Plain text frames
+            if hasattr(shape, 'has_text_frame') and shape.has_text_frame and shape.text_frame.text.strip():
+                text = shape.text_frame.text.strip()
+                type_hint = "Body"
+                if hasattr(shape, 'is_placeholder') and shape.is_placeholder:
+                    try:
+                        ph = shape.placeholder_format
+                        if ph.type in {
+                            PP_PLACEHOLDER.TITLE,
+                            PP_PLACEHOLDER.CENTER_TITLE,
+                            PP_PLACEHOLDER.SUBTITLE,
+                            PP_PLACEHOLDER.VERTICAL_TITLE,
+                        }:
+                            type_hint = "Title/Subtitle"
+                        elif ph.type == PP_PLACEHOLDER.BODY:
+                            type_hint = "Body Placeholder"
+                        elif ph.type == PP_PLACEHOLDER.OBJECT and hasattr(shape, 'name') and "Title" in shape.name:
+                            type_hint = "Object Title"
+                    except Exception:
+                        pass  # Placeholder format access can fail
 
-            chunks.append({"id": sid, "type": type_hint, "text": text})
+                chunks.append({"id": sid, "type": type_hint, "text": text})
 
-        # 2) Table cells
-        elif shape.has_table:
-            tbl_txt = []
-            for r, row in enumerate(shape.table.rows):
-                for c, cell in enumerate(row.cells):
-                    cell_txt = cell.text_frame.text.strip()
-                    if cell_txt:
-                        tbl_txt.append(f"Row {r+1}, Col {c+1}: {cell_txt}")
-            if tbl_txt:
-                chunks.append({"id": sid, "type": "Table", "text": "\\n".join(tbl_txt)})
+            # 2) Table cells (with limits to prevent hanging)
+            elif hasattr(shape, 'has_table') and shape.has_table:
+                tbl_txt = []
+                max_rows = min(50, len(shape.table.rows))  # Limit to 50 rows
+                for r in range(max_rows):
+                    row = shape.table.rows[r]
+                    max_cols = min(20, len(row.cells))  # Limit to 20 columns
+                    for c in range(max_cols):
+                        try:
+                            cell = row.cells[c]
+                            cell_txt = cell.text_frame.text.strip()
+                            if cell_txt:
+                                tbl_txt.append(f"Row {r+1}, Col {c+1}: {cell_txt}")
+                        except Exception as e:
+                            print(f"[WARNING] Error reading table cell [{r},{c}]: {e}")
+                            continue
+                if tbl_txt:
+                    chunks.append({"id": sid, "type": "Table", "text": "\\n".join(tbl_txt)})
 
-        # 3) Grouped shapes
-        elif shape.shape_type == MSO_SHAPE_TYPE.GROUP:
-            for s in shape.shapes:
-                chunks.extend(self.extract_text_recursive(s))
+            # 3) Grouped shapes (with depth tracking)
+            elif hasattr(shape, 'shape_type') and shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+                if hasattr(shape, 'shapes'):
+                    max_shapes = min(100, len(shape.shapes))  # Limit to 100 shapes per group
+                    for i in range(max_shapes):
+                        try:
+                            s = shape.shapes[i]
+                            chunks.extend(self.extract_text_recursive(s, depth + 1, max_depth))
+                        except Exception as e:
+                            print(f"[WARNING] Error processing grouped shape {i}: {e}")
+                            continue
 
-        # 4) Chart title (limited)
-        elif shape.has_chart:
-            ch = shape.chart
-            if ch.has_title and ch.chart_title.text_frame.text.strip():
-                chunks.append(
-                    {
-                        "id": sid,
-                        "type": "Chart Info",
-                        "text": f"Chart Title: {ch.chart_title.text_frame.text.strip()}",
-                    }
-                )
+            # 4) Chart title (limited)
+            elif hasattr(shape, 'has_chart') and shape.has_chart:
+                try:
+                    ch = shape.chart
+                    if hasattr(ch, 'has_title') and ch.has_title and ch.chart_title.text_frame.text.strip():
+                        chunks.append(
+                            {
+                                "id": sid,
+                                "type": "Chart Info",
+                                "text": f"Chart Title: {ch.chart_title.text_frame.text.strip()}",
+                            }
+                        )
+                except Exception as e:
+                    print(f"[WARNING] Error processing chart: {e}")
+
+        except Exception as e:
+            print(f"[ERROR] Error processing shape {sid}: {e}")
 
         return chunks
 
     def extract_powerpoint_text(self, pptx_path: str) -> Optional[List[Dict[str, Any]]]:
         """Extract text from PowerPoint file and return structured data."""
+        import time
+
         if not Path(pptx_path).exists():
             raise FileNotFoundError(f"File not found: {pptx_path}")
 
+        print(f"[INFO] Starting PowerPoint extraction: {pptx_path}")
+        start_time = time.time()
+
         try:
             prs = Presentation(pptx_path)
+            print(f"[INFO] Successfully opened presentation with {len(prs.slides)} slides")
         except Exception as exc:
             raise ValueError(f"Could not open presentation: {exc}")
 
         slides_data = []
-        for idx, slide in enumerate(prs.slides, start=1):
-            slide_info = {"slide_number": idx, "elements": [], "notes": None}
+        max_slides = min(500, len(prs.slides))  # Limit to 500 slides maximum
 
-            for shp in slide.shapes:
-                slide_info["elements"].extend(self.extract_text_recursive(shp))
+        for idx in range(max_slides):
+            slide = prs.slides[idx]
+            slide_info = {"slide_number": idx + 1, "elements": [], "notes": None}
 
-            if slide.has_notes_slide:
-                notes_tf = slide.notes_slide.notes_text_frame
-                if notes_tf and notes_tf.text.strip():
-                    slide_info["notes"] = notes_tf.text.strip()
+            # Check timeout (5 minutes max for parsing)
+            if time.time() - start_time > 300:
+                print(f"[WARNING] Extraction timeout after 5 minutes, stopping at slide {idx + 1}")
+                break
+
+            print(f"[DEBUG] Processing slide {idx + 1}/{max_slides}")
+
+            try:
+                # Extract from shapes with limits
+                max_shapes = min(200, len(slide.shapes))  # Limit to 200 shapes per slide
+                for shape_idx in range(max_shapes):
+                    try:
+                        shp = slide.shapes[shape_idx]
+                        extracted = self.extract_text_recursive(shp, depth=0, max_depth=5)
+                        slide_info["elements"].extend(extracted)
+                    except Exception as e:
+                        print(f"[WARNING] Error processing shape {shape_idx} on slide {idx + 1}: {e}")
+                        continue
+
+                # Extract notes with timeout protection
+                if hasattr(slide, 'has_notes_slide') and slide.has_notes_slide:
+                    try:
+                        notes_tf = slide.notes_slide.notes_text_frame
+                        if notes_tf and notes_tf.text.strip():
+                            slide_info["notes"] = notes_tf.text.strip()
+                    except Exception as e:
+                        print(f"[WARNING] Error extracting notes from slide {idx + 1}: {e}")
+
+            except Exception as e:
+                print(f"[WARNING] Error processing slide {idx + 1}: {e}")
 
             # Always add slide even if empty (for consistent page numbering)
             slides_data.append(slide_info)
+
+        elapsed = time.time() - start_time
+        print(f"[INFO] PowerPoint extraction completed in {elapsed:.2f} seconds, processed {len(slides_data)} slides")
 
         return slides_data
 
@@ -253,23 +319,39 @@ class TextChunker:
 
 def extract_ppt_for_zd(file_path: str, mode: str = "fast") -> Dict[str, Any]:
     """Main function to extract and chunk PPT for ZD analysis."""
+    import time
+
+    start_time = time.time()
+    print(f"[INFO] Starting ZD extraction for: {file_path} (mode: {mode})")
+
     try:
         extractor = PPTExtractor()
         chunker = TextChunker()
 
-        # Extract raw data
+        # Extract raw data with timeout
+        print("[INFO] Step 1: Extracting PowerPoint text...")
         raw_slides = extractor.extract_powerpoint_text(file_path)
         if not raw_slides:
             raise ValueError("No extractable text found in the presentation")
 
+        print(f"[INFO] Step 2: Converting {len(raw_slides)} slides to ZD format...")
         # Convert to ZD format
         zd_slides = extractor.convert_to_zd_format(raw_slides)
 
+        print("[INFO] Step 3: Calculating statistics...")
         # Get statistics
         stats = extractor.get_slide_stats(zd_slides)
 
-        # Create chunks
+        print(f"[INFO] Step 4: Creating chunks in {mode} mode...")
+        # Create chunks with timeout check
+        if time.time() - start_time > 300:  # 5 minute total timeout
+            raise TimeoutError("Total extraction time exceeded 5 minutes")
+
         chunks = chunker.create_chunks(zd_slides, mode)
+
+        elapsed = time.time() - start_time
+        print(f"[INFO] ZD extraction completed successfully in {elapsed:.2f} seconds")
+        print(f"[INFO] Results: {len(zd_slides)} slides, {len(chunks)} chunks, {stats.get('total_words', 0)} words")
 
         return {
             "success": True,
@@ -280,6 +362,8 @@ def extract_ppt_for_zd(file_path: str, mode: str = "fast") -> Dict[str, Any]:
         }
 
     except Exception as e:
+        elapsed = time.time() - start_time
+        print(f"[ERROR] ZD extraction failed after {elapsed:.2f} seconds: {str(e)}")
         return {
             "success": False,
             "error": str(e),
