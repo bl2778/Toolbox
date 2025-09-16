@@ -736,13 +736,17 @@
         function updateChunksDisplay(status) {
             const chunksInfo = document.getElementById('chunksInfo');
 
-            // Initialize chunk sections if not already done
-            if (status.chunk_details && !chunksInfo.hasChildNodes()) {
-                createChunkSections(status.chunk_details);
-            }
-
-            // Update existing chunk sections
             if (status.chunk_details) {
+                // Check for new chunks that don't have UI sections yet
+                Object.keys(status.chunk_details).forEach(chunkId => {
+                    const existingSection = document.getElementById(`chunk-${chunkId}`);
+                    if (!existingSection) {
+                        // Create section for this new chunk
+                        createChunkSection(chunkId, status.chunk_details[chunkId]);
+                    }
+                });
+
+                // Update all existing chunk sections
                 updateChunkSections(status.chunk_details);
             }
         }
@@ -809,6 +813,75 @@
 
                 chunksInfo.appendChild(chunkSection);
             });
+        }
+
+        function createChunkSection(chunkId, chunkData) {
+            const chunksInfo = document.getElementById('chunksInfo');
+
+            const chunkSection = document.createElement('div');
+            chunkSection.className = 'zd-chunk-section';
+            chunkSection.id = `chunk-${chunkId}`;
+
+            const statusIcon = getStatusIcon(chunkData.status);
+            const statusText = getStatusText(chunkData.status);
+
+            chunkSection.innerHTML = `
+                <div class="zd-chunk-header ${chunkData.status}" onclick="toggleChunkDetails('${chunkId}')">
+                    <div class="zd-chunk-title">
+                        ${statusIcon} Chunk ${chunkId.replace('ck_', '')} (Pages ${chunkData.page_start}-${chunkData.page_end})
+                    </div>
+                    <div class="zd-chunk-status">
+                        <span class="zd-chunk-progress">${chunkData.ai_progress || statusText}</span>
+                        ${chunkData.status === 'failed' ? `<button class="zd-retry-btn" onclick="retryChunk('${chunkId}', event)">Retry</button>` : ''}
+                        <span class="zd-chunk-toggle" id="toggle-${chunkId}">▼</span>
+                    </div>
+                </div>
+                <div class="zd-chunk-details" id="details-${chunkId}">
+                    <div class="zd-chunk-info">
+                        <div class="zd-chunk-info-item">
+                            <strong>Pages:</strong> ${chunkData.page_start} - ${chunkData.page_end}<br>
+                            <strong>Word Count:</strong> ${chunkData.word_count || 'N/A'}
+                        </div>
+                        <div class="zd-chunk-info-item">
+                            <strong>Status:</strong> ${statusText}<br>
+                            <strong>Started:</strong> ${formatTime(chunkData.start_time)}
+                        </div>
+                    </div>
+                    ${chunkData.error ? `<div style="color: #dc3545; margin-bottom: 10px;"><strong>Error:</strong> ${chunkData.error}</div>` : ''}
+                    <div>
+                        <strong>AI Streaming Output:</strong>
+                        <div class="zd-format-toggle">
+                            <label>
+                                <input type="radio" name="format-${chunkId}" value="raw" checked onchange="toggleOutputFormat('${chunkId}', 'raw')">
+                                Raw
+                            </label>
+                            <label>
+                                <input type="radio" name="format-${chunkId}" value="markdown" onchange="toggleOutputFormat('${chunkId}', 'markdown')">
+                                Markdown
+                            </label>
+                        </div>
+                        <div class="zd-streaming-output ${chunkData.streaming_output ? '' : 'empty'}" id="streaming-${chunkId}">
+                            ${chunkData.streaming_output || 'No output yet...'}
+                        </div>
+                    </div>
+                    <div class="zd-chunk-timing" id="timing-${chunkId}">
+                        ${getTimingInfo(chunkData)}
+                    </div>
+                </div>
+            `;
+
+            // Insert the section in the correct position (sorted by chunk_id)
+            const existingSections = Array.from(chunksInfo.children);
+            const insertIndex = existingSections.findIndex(section => {
+                const existingId = section.id.replace('chunk-', '');
+                return chunkId.localeCompare(existingId) < 0;
+            });
+
+            if (insertIndex === -1) {
+                chunksInfo.appendChild(chunkSection);
+            } else {
+                chunksInfo.insertBefore(chunkSection, existingSections[insertIndex]);
+            }
         }
 
         function updateChunkSections(chunkDetails) {
