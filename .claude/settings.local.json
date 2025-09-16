@@ -10,7 +10,9 @@
       "Bash(git commit:*)",
       "Bash(pip install:*)",
       "Bash(pip freeze)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

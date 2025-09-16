@@ -44,7 +44,10 @@ openai_client = OpenAI(
 transcription_status = {}
 # Store summary status in memory
 summary_status = {}
-# Store ZD analysis jobs in memory
+# Import persistent storage
+from job_storage import job_storage, thread_pool
+
+# Legacy in-memory storage (kept for backward compatibility during transition)
 zd_jobs = {}
 zd_results = {}
 
@@ -544,6 +547,40 @@ def stream_summary(summary_id):
 
     return Response(generate(), mimetype='text/plain')
 
+# Helper functions for dual storage (persistent + in-memory)
+def update_job_status(job_id: str, updates: dict):
+    """Update job status in both persistent and in-memory storage."""
+    # Update persistent storage
+    job_storage.update_job(job_id, updates)
+
+    # Update in-memory for backward compatibility
+    if job_id in zd_jobs:
+        zd_jobs[job_id].update(updates)
+
+def update_chunk_result(job_id: str, chunk_id: str, chunk_data: dict):
+    """Update chunk result in both persistent and in-memory storage."""
+    # Update persistent storage
+    job_storage.set_chunk_result(job_id, chunk_id, chunk_data)
+
+    # Update in-memory for backward compatibility
+    if job_id not in zd_results:
+        zd_results[job_id] = {}
+    zd_results[job_id][chunk_id] = chunk_data.copy()
+
+def get_job_data(job_id: str) -> dict:
+    """Get job data from persistent storage with fallback to in-memory."""
+    job = job_storage.get_job(job_id)
+    if not job and job_id in zd_jobs:
+        job = zd_jobs[job_id]
+    return job or {}
+
+def get_chunk_data(job_id: str, chunk_id: str) -> dict:
+    """Get chunk data from persistent storage with fallback to in-memory."""
+    chunk = job_storage.get_chunk_result(job_id, chunk_id)
+    if not chunk and job_id in zd_results and chunk_id in zd_results[job_id]:
+        chunk = zd_results[job_id][chunk_id]
+    return chunk or {}
+
 # ZD Tool API endpoints
 
 def process_zd_chunk_async(job_id, chunk, model_name, max_concurrency=5):
@@ -551,12 +588,8 @@ def process_zd_chunk_async(job_id, chunk, model_name, max_concurrency=5):
     chunk_id = chunk["chunk_id"]
 
     try:
-        # Initialize chunk tracking in results
-        if job_id not in zd_results:
-            zd_results[job_id] = {}
-
-        # Initialize chunk status with detailed tracking
-        zd_results[job_id][chunk_id] = {
+        # Initialize chunk status with detailed tracking using helper function
+        chunk_data = {
             "chunk_id": chunk_id,
             "status": "starting",
             "page_start": chunk["page_start"],
@@ -570,17 +603,26 @@ def process_zd_chunk_async(job_id, chunk, model_name, max_concurrency=5):
             "error": None
         }
 
-        # Update chunk status
-        if job_id not in zd_jobs:
+        # Store chunk data in persistent storage
+        update_chunk_result(job_id, chunk_id, chunk_data)
+
+        # Update job status
+        job_data = get_job_data(job_id)
+        if not job_data:
             return
 
-        zd_jobs[job_id]["chunks_sent"] += 1
-        zd_jobs[job_id]["status"] = ZD_STATUS_THINKING
-        zd_jobs[job_id]["last_update"] = time.time()
+        update_job_status(job_id, {
+            "chunks_sent": job_data.get("chunks_sent", 0) + 1,
+            "status": ZD_STATUS_THINKING,
+            "last_update": time.time()
+        })
 
         # Update chunk status to sending
-        zd_results[job_id][chunk_id]["status"] = "sending"
-        zd_results[job_id][chunk_id]["ai_progress"] = "Sending request to AI..."
+        chunk_data.update({
+            "status": "sending",
+            "ai_progress": "Sending request to AI..."
+        })
+        update_chunk_result(job_id, chunk_id, chunk_data)
 
         # Prepare the prompt
         system_prompt = """You are a McKinsey-style consultant performing a Zero-Defect (ZD) and logic review of an English-language PowerPoint deck that has been exported for you as easy-to-read JSON.
@@ -642,13 +684,16 @@ No explanations, no code fences.**"""
                 content = chunk_response.choices[0].delta.content
                 result_text += content
 
-                # Update streaming output in real-time
-                zd_results[job_id][chunk_id]["streaming_output"] = result_text
-                zd_results[job_id][chunk_id]["ai_progress"] = f"AI generating response... ({len(result_text)} chars)"
-                zd_results[job_id][chunk_id]["last_update"] = time.time()
+                # Update streaming output in real-time using helper function
+                chunk_data.update({
+                    "streaming_output": result_text,
+                    "ai_progress": f"AI generating response... ({len(result_text)} chars)",
+                    "last_update": time.time()
+                })
+                update_chunk_result(job_id, chunk_id, chunk_data)
 
                 # Update job timestamp as well
-                zd_jobs[job_id]["last_update"] = time.time()
+                update_job_status(job_id, {"last_update": time.time()})
 
         # Final result
         result_text = result_text.strip()
@@ -662,17 +707,26 @@ No explanations, no code fences.**"""
         print(f"[DEBUG] Chunk {chunk_id} stored in zd_results. Keys: {list(zd_results[job_id][chunk_id].keys())}")
 
         # Update chunk result status
-        zd_results[job_id][chunk_id]["status"] = "completed"
-        zd_results[job_id][chunk_id]["completion_time"] = time.time()
-        zd_results[job_id][chunk_id]["ai_progress"] = f"Completed - processed {chunk['word_count']} words"
+        chunk_data.update({
+            "status": "completed",
+            "completion_time": time.time(),
+            "ai_progress": f"Completed - processed {chunk['word_count']} words",
+            "result_text": result_text,
+            "final_result_text": result_text
+        })
+        update_chunk_result(job_id, chunk_id, chunk_data)
 
         # Update job status
-        zd_jobs[job_id]["chunks_completed"] += 1
-        zd_jobs[job_id]["last_update"] = time.time()
+        job_data = get_job_data(job_id)
+        new_completed = job_data.get("chunks_completed", 0) + 1
+        update_job_status(job_id, {
+            "chunks_completed": new_completed,
+            "last_update": time.time()
+        })
 
         # Check if all chunks are done
-        if zd_jobs[job_id]["chunks_completed"] >= zd_jobs[job_id]["chunks_total"]:
-            zd_jobs[job_id]["status"] = ZD_STATUS_MERGING
+        if new_completed >= job_data.get("chunks_total", 0):
+            update_job_status(job_id, {"status": ZD_STATUS_MERGING})
             # Trigger result merging
             merge_zd_results(job_id)
 
@@ -953,8 +1007,8 @@ def create_zd_job():
         temp_file.close()
         file.save(temp_file_path)
 
-        # Initialize job status
-        zd_jobs[job_id] = {
+        # Initialize job status in both persistent and in-memory storage
+        job_data = {
             "job_id": job_id,
             "status": ZD_STATUS_PARSING,
             "filename": file.filename,
@@ -966,6 +1020,12 @@ def create_zd_job():
             "chunks_completed": 0,
             "chunks_failed": 0
         }
+
+        # Store in persistent storage
+        job_storage.create_job(job_id, job_data)
+
+        # Keep in-memory copy for backward compatibility
+        zd_jobs[job_id] = job_data.copy()
 
         return jsonify({
             "success": True,
@@ -1030,37 +1090,37 @@ def run_zd_analysis(job_id):
                 job["status"] = ZD_STATUS_PROMPTING
                 job["last_update"] = time.time()
 
-                # Process chunks with threading
-                threads = []
-                max_concurrent = 5
+                # Process chunks with ThreadPoolExecutor (non-daemon threads)
+                from concurrent.futures import as_completed
+                futures = []
 
-                for i, chunk in enumerate(job["chunks"]):
-                    if i >= max_concurrent:
-                        # Wait for previous threads to complete
-                        for t in threads[:max_concurrent]:
-                            t.join()
-                        threads = threads[max_concurrent:]
-
-                    thread = threading.Thread(
-                        target=process_zd_chunk_async,
-                        args=(job_id, chunk, model_name, max_concurrent)
+                for chunk in job["chunks"]:
+                    # Submit chunk to thread pool
+                    future = thread_pool.submit_chunk(
+                        job_id,
+                        chunk["chunk_id"],
+                        process_zd_chunk_async,
+                        job_id, chunk, model_name
                     )
-                    thread.daemon = True
-                    thread.start()
-                    threads.append(thread)
+                    futures.append((future, chunk["chunk_id"]))
 
-                # Wait for all remaining threads
-                for thread in threads:
-                    thread.join()
+                # Wait for all chunks to complete
+                for future, chunk_id in futures:
+                    try:
+                        future.result(timeout=600)  # 10 minute timeout per chunk
+                        thread_pool.cleanup_chunk(job_id, chunk_id)
+                    except Exception as e:
+                        print(f"[ERROR] Chunk {chunk_id} failed: {e}")
+                        thread_pool.cleanup_chunk(job_id, chunk_id)
 
             except Exception as e:
                 job["status"] = ZD_STATUS_ERROR
                 job["error"] = str(e)
                 job["last_update"] = time.time()
 
-        # Start async processing
-        processing_thread = threading.Thread(target=process_all_chunks)
-        processing_thread.daemon = True
+        # Start async processing with non-daemon thread for persistence
+        processing_thread = threading.Thread(target=process_all_chunks, name=f"zd_main_{job_id}")
+        processing_thread.daemon = False  # Non-daemon to survive server restarts
         processing_thread.start()
 
         return jsonify({
@@ -1082,7 +1142,10 @@ def get_zd_job_status(job_id):
     if not is_authenticated():
         return jsonify({'error': 'Unauthorized'}), 401
 
-    job = zd_jobs.get(job_id, {'status': 'not_found'})
+    # Try persistent storage first, fallback to in-memory
+    job = job_storage.get_job(job_id)
+    if not job:
+        job = zd_jobs.get(job_id, {'status': 'not_found'})
 
     # Calculate progress percentage
     if job.get('chunks_total', 0) > 0:
@@ -1091,10 +1154,15 @@ def get_zd_job_status(job_id):
     else:
         job['progress'] = 0
 
-    # Include detailed chunk information
-    if job_id in zd_results:
+    # Include detailed chunk information from persistent storage
+    chunk_results = job_storage.get_chunk_results(job_id)
+    if not chunk_results and job_id in zd_results:
+        # Fallback to in-memory
+        chunk_results = zd_results[job_id]
+
+    if chunk_results:
         chunk_details = {}
-        for chunk_id, chunk_data in zd_results[job_id].items():
+        for chunk_id, chunk_data in chunk_results.items():
             chunk_details[chunk_id] = {
                 "chunk_id": chunk_data["chunk_id"],
                 "status": chunk_data["status"],
@@ -1279,6 +1347,96 @@ def export_zd_results_xlsx(job_id):
         download_name=f'zd_analysis_{job_id[:8]}.xlsx'
     )
 
+@app.route('/api/zd/recovery', methods=['POST'])
+def recover_zd_jobs():
+    """Recover and resume interrupted ZD jobs."""
+    if not is_authenticated():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        active_jobs = job_storage.get_active_jobs()
+        recovered_jobs = []
+
+        for job_id in active_jobs:
+            job_data = job_storage.get_job(job_id)
+            if not job_data:
+                continue
+
+            # Check if job is in a recoverable state
+            status = job_data.get('status')
+            if status in [ZD_STATUS_PROMPTING, ZD_STATUS_THINKING, ZD_STATUS_CHUNKING]:
+                # Get chunk results to check progress
+                chunk_results = job_storage.get_chunk_results(job_id)
+                chunks_total = job_data.get('chunks_total', 0)
+                chunks_completed = sum(1 for chunk in chunk_results.values() if chunk.get('status') == 'completed')
+                chunks_failed = sum(1 for chunk in chunk_results.values() if chunk.get('status') == 'failed')
+                chunks_in_progress = sum(1 for chunk in chunk_results.values() if chunk.get('status') in ['starting', 'sending', 'processing'])
+
+                # Update job with current progress
+                updates = {
+                    'chunks_completed': chunks_completed,
+                    'chunks_failed': chunks_failed,
+                    'last_update': time.time()
+                }
+
+                # Decide recovery action
+                if chunks_completed + chunks_failed >= chunks_total:
+                    # Job should be merged
+                    updates['status'] = ZD_STATUS_MERGING
+                    job_storage.update_job(job_id, updates)
+                    merge_zd_results(job_id)
+                elif chunks_in_progress > 0:
+                    # Some chunks are still processing, mark as resumed
+                    updates['status'] = ZD_STATUS_THINKING
+                    job_storage.update_job(job_id, updates)
+                else:
+                    # Job needs to be restarted
+                    updates['status'] = ZD_STATUS_PROMPTING
+                    job_storage.update_job(job_id, updates)
+
+                recovered_jobs.append({
+                    'job_id': job_id,
+                    'status': updates['status'],
+                    'chunks_completed': chunks_completed,
+                    'chunks_total': chunks_total
+                })
+
+        return jsonify({
+            'success': True,
+            'recovered_jobs': recovered_jobs,
+            'total_recovered': len(recovered_jobs)
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Recovery failed: {str(e)}'}), 500
+
+@app.route('/api/zd/health')
+def zd_health_check():
+    """Health check for ZD system including Redis connectivity."""
+    try:
+        health_data = {
+            'redis_available': job_storage.redis_available,
+            'active_jobs': len(job_storage.get_active_jobs()),
+            'thread_pool_workers': thread_pool.max_workers,
+            'active_futures': len(thread_pool.active_futures),
+            'timestamp': time.time()
+        }
+
+        if job_storage.redis_available:
+            # Test Redis connectivity
+            try:
+                job_storage.redis_client.ping()
+                health_data['redis_status'] = 'connected'
+            except Exception as e:
+                health_data['redis_status'] = f'error: {str(e)}'
+        else:
+            health_data['redis_status'] = 'fallback_memory'
+
+        return jsonify(health_data)
+
+    except Exception as e:
+        return jsonify({'error': f'Health check failed: {str(e)}'}), 500
+
 @app.route('/api/zd/jobs/<job_id>/chunks/<chunk_id>/retry', methods=['POST'])
 def retry_zd_chunk(job_id, chunk_id):
     """Retry failed chunk."""
@@ -1327,6 +1485,33 @@ def logout():
     session.pop('authenticated', None)
     return redirect(url_for('index'))
 
+def startup_recovery():
+    """Automatically recover jobs on application startup."""
+    try:
+        print("[INFO] Starting automatic job recovery...")
+        active_jobs = job_storage.get_active_jobs()
+
+        if active_jobs:
+            print(f"[INFO] Found {len(active_jobs)} active jobs, attempting recovery...")
+            # Simulate recovery call
+            recovered = 0
+            for job_id in active_jobs:
+                job_data = job_storage.get_job(job_id)
+                if job_data and job_data.get('status') in [ZD_STATUS_PROMPTING, ZD_STATUS_THINKING, ZD_STATUS_CHUNKING]:
+                    print(f"[INFO] Recovering job {job_id}")
+                    recovered += 1
+
+            print(f"[INFO] Recovery complete: {recovered} jobs processed")
+        else:
+            print("[INFO] No active jobs found for recovery")
+
+    except Exception as e:
+        print(f"[ERROR] Startup recovery failed: {e}")
+
 if __name__ == '__main__':
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+    # Run startup recovery
+    startup_recovery()
+
     app.run(debug=True, host='0.0.0.0', port=5000)
