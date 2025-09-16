@@ -5,6 +5,86 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Transcription - Bain Toolbox</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* Markdown styling */
+        .markdown-content {
+            line-height: 1.6;
+            color: #333;
+        }
+        .markdown-content h1, .markdown-content h2, .markdown-content h3,
+        .markdown-content h4, .markdown-content h5, .markdown-content h6 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-weight: bold;
+        }
+        .markdown-content h1 { font-size: 1.8em; color: #2c3e50; }
+        .markdown-content h2 { font-size: 1.5em; color: #34495e; }
+        .markdown-content h3 { font-size: 1.3em; color: #34495e; }
+        .markdown-content p { margin-bottom: 1em; }
+        .markdown-content ul, .markdown-content ol {
+            margin-bottom: 1em;
+            padding-left: 2em;
+        }
+        .markdown-content li { margin-bottom: 0.5em; }
+        .markdown-content blockquote {
+            border-left: 4px solid #ddd;
+            margin: 1em 0;
+            padding-left: 1em;
+            color: #666;
+        }
+        .markdown-content code {
+            background-color: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        .markdown-content pre {
+            background-color: #f4f4f4;
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 1em 0;
+        }
+        .markdown-content strong { font-weight: bold; }
+        .markdown-content em { font-style: italic; }
+
+        /* Collapsible section styling */
+        .collapsible {
+            background-color: #f1f3f4;
+            color: #333;
+            cursor: pointer;
+            padding: 15px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 16px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            transition: background-color 0.3s;
+        }
+        .collapsible:hover {
+            background-color: #e8eaed;
+        }
+        .collapsible.active {
+            background-color: #d1ecf1;
+        }
+        .collapsible-content {
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background-color: white;
+            border-radius: 5px;
+        }
+        .collapsible-content.active {
+            padding: 15px;
+            max-height: none;
+            border: 1px solid #ddd;
+        }
+    </style>
 </head>
 <body>
     <a href="/logout" class="logout-btn">Logout</a>
@@ -101,7 +181,7 @@
                 <textarea id="editTextarea" class="form-input" rows="15" style="width: 100%; resize: vertical;"></textarea>
             </div>
 
-            <div style="margin-top: 20px; text-align: center; display: flex; gap: 10px; justify-content: center;">
+            <div style="margin-top: 20px; text-align: center; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
                 <button type="button" class="btn" id="copyBtn" onclick="copyToClipboard()">
                     📋 Copy to Clipboard
                 </button>
@@ -114,6 +194,128 @@
                 <button type="button" class="btn" id="cancelBtn" onclick="cancelEdit()" style="background: #e74c3c; display: none;">
                     ❌ Cancel
                 </button>
+                <button type="button" class="btn" id="summaryBtn" onclick="startSummary()" style="background: #9b59b6;">
+                    🤖 Auto Summary
+                </button>
+            </div>
+        </div>
+
+        <!-- Summary Section (Full Two Column Layout) -->
+        <div id="summarySection" style="display: none;">
+            <!-- Back to Single Column Button at top -->
+            <div style="text-align: center; margin-bottom: 20px;">
+                <button type="button" class="btn" onclick="closeSummary()" style="background: #6c757d;">
+                    ← Back to Single Column View
+                </button>
+            </div>
+
+            <div style="display: flex; gap: 20px; min-height: 80vh;">
+                <!-- Left Column: All Original Content -->
+                <div style="flex: 1;">
+                    <!-- Header -->
+                    <div class="card">
+                        <h1 class="title">🎤 Audio Transcription</h1>
+                        <p class="subtitle">Upload your client interview recordings for AI-powered transcription</p>
+                    </div>
+
+                    <!-- Upload Section (in summary mode) -->
+                    <div class="card" id="uploadSectionSummary" style="display: none;">
+                        <h2 style="margin-bottom: 20px; color: #333;">Upload Audio File</h2>
+                        <div class="file-upload-area" id="uploadAreaSummary">
+                            <div class="upload-icon">📁</div>
+                            <div class="upload-text">
+                                <strong>Drag & drop your audio file here</strong><br>
+                                or <strong>click to select</strong>
+                                <br><br>
+                                <small>Supported formats: MP3, WAV, M4A, MP4, WEBM (Max: 300MB)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transcript Results in Summary Mode -->
+                    <div class="card">
+                        <h2 style="margin-bottom: 20px; color: #333;">Transcription Results</h2>
+                        <div style="margin-bottom: 15px;">
+                            <strong>Prompt Used:</strong> <span id="promptUsedSummary"></span>
+                        </div>
+                        <div class="transcription-result" id="originalTranscriptText" style="max-height: 500px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Summary Panel -->
+                <div style="flex: 1;">
+                    <div class="card" style="height: fit-content;">
+                        <h2 style="margin-bottom: 20px; color: #333;">🤖 AI Summary</h2>
+
+                        <!-- Model Selection -->
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label for="summaryModelSelect" class="form-label">AI Model:</label>
+                            <select id="summaryModelSelect" class="form-input" style="height: auto; padding: 12px;">
+                                <option value="gpt-5" selected>GPT-5 (Latest)</option>
+                                <option value="gpt-5-thinking">GPT-5 Thinking (Shows reasoning process)</option>
+                            </select>
+                            <small style="color: #666; display: block; margin-top: 5px;">
+                                GPT-5 Thinking: Shows the AI's thought process with streaming output
+                            </small>
+                        </div>
+
+                        <!-- Prompt Editor -->
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label for="summaryPrompt" class="form-label">Summary Prompt:</label>
+                            <textarea id="summaryPrompt"
+                                      class="form-input"
+                                      rows="6"
+                                      style="resize: vertical;"
+                                      placeholder="Loading default prompt...">You are a McKinsey consultant, now helping client doing a project. Now you just had an interview, can you pls summarize the key takeaways using McKinsey wording style. Pls output in Email ready format with two sections a) Executive Summaries b) Details. The summary should exactly follow what was discussed in transcript, pls don't imagine.</textarea>
+                            <small style="color: #666; display: block; margin-top: 5px;">
+                                Note: The transcript will be automatically appended after your prompt.
+                            </small>
+                        </div>
+
+                        <!-- Generate Button -->
+                        <button type="button" class="btn" id="generateSummaryBtn" onclick="generateSummary()" style="background: #9b59b6; margin-bottom: 20px; width: 100%;">
+                            🚀 Generate Summary
+                        </button>
+
+                        <!-- Summary Progress -->
+                        <div id="summaryProgress" style="display: none; margin-bottom: 20px;">
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid #9b59b6;">
+                                <div id="summaryProgressText">准备生成摘要...</div>
+                            </div>
+                        </div>
+
+                        <!-- Thinking Process Section -->
+                        <div id="thinkingSection" style="display: none; margin-bottom: 20px;">
+                            <button class="collapsible active" onclick="toggleThinking()">
+                                <span>🤔 Thought</span>
+                                <span id="thinkingToggleIcon" style="float: right;">▼</span>
+                            </button>
+                            <div class="collapsible-content active" id="thinkingContent">
+                                <div class="markdown-content" id="thinkingText" style="max-height: 400px; overflow-y: auto;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Final Summary Section -->
+                        <div id="summaryResult" style="display: none;">
+                            <button class="collapsible active" onclick="toggleAnswer()">
+                                <span>💡 Final Summary</span>
+                                <span id="answerToggleIcon" style="float: right;">▼</span>
+                            </button>
+                            <div class="collapsible-content active" id="answerContent">
+                                <div class="markdown-content" id="answerText" style="max-height: 500px; overflow-y: auto;"></div>
+                            </div>
+
+                            <div style="margin-top: 15px; text-align: center; display: flex; gap: 10px;">
+                                <button type="button" class="btn" id="copyThinkingBtn" onclick="copyThinkingToClipboard()" style="background: #3498db; flex: 1; display: none;">
+                                    📋 Copy Thinking
+                                </button>
+                                <button type="button" class="btn" onclick="copySummaryToClipboard()" style="background: #27ae60; width: 100%;">
+                                    📋 Copy Summary
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -492,6 +694,338 @@
                 }, 2000);
             }).catch(err => {
                 alert('Failed to copy to clipboard');
+            });
+        }
+
+        // Summary functionality
+        let currentSummaryId = null;
+
+        function startSummary() {
+            if (!currentTaskId) {
+                alert('No transcription available for summary');
+                return;
+            }
+
+            // Get current transcript text
+            let transcriptText;
+            if (isEditing) {
+                transcriptText = document.getElementById('editTextarea').value;
+            } else {
+                transcriptText = document.getElementById('transcriptionText').textContent;
+            }
+
+            // Get prompt used for transcription
+            const promptUsed = document.getElementById('promptUsed').textContent;
+
+            // Show summary section and hide all other sections
+            document.getElementById('summarySection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+
+            // Hide the main container content to switch to full-width layout
+            const mainCards = document.querySelectorAll('.container > .card:not(#summarySection)');
+            mainCards.forEach(card => {
+                if (card.id !== 'summarySection') {
+                    card.style.display = 'none';
+                }
+            });
+
+            // Copy transcript and prompt to left column
+            document.getElementById('originalTranscriptText').textContent = transcriptText;
+            document.getElementById('promptUsedSummary').textContent = promptUsed;
+
+            // Reset summary state
+            document.getElementById('summaryResult').style.display = 'none';
+            document.getElementById('thinkingSection').style.display = 'none';
+            document.getElementById('summaryProgress').style.display = 'none';
+            document.getElementById('generateSummaryBtn').disabled = false;
+            currentSummaryId = null;
+
+            // Reset button states
+            document.getElementById('copyThinkingBtn').style.display = 'none';
+            document.querySelector('#summaryResult .btn[onclick="copySummaryToClipboard()"]').style.width = '100%';
+            document.querySelector('#summaryResult .btn[onclick="copySummaryToClipboard()"]').style.flex = 'none';
+
+            // Make container wider for two-column layout
+            document.querySelector('.container').style.maxWidth = '100%';
+            document.querySelector('.container').style.width = '100%';
+            document.querySelector('.container').style.padding = '20px';
+        }
+
+        function closeSummary() {
+            // Hide summary section and show all original sections
+            document.getElementById('summarySection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'block';
+
+            // Show all hidden main container cards
+            const mainCards = document.querySelectorAll('.container > .card:not(#summarySection)');
+            mainCards.forEach(card => {
+                if (card.id !== 'summarySection') {
+                    card.style.display = 'block';
+                }
+            });
+
+            // Restore original container width
+            document.querySelector('.container').style.maxWidth = '900px';
+            document.querySelector('.container').style.width = 'auto';
+            document.querySelector('.container').style.padding = '20px';
+        }
+
+        async function generateSummary() {
+            if (!currentTaskId) {
+                alert('No transcription available');
+                return;
+            }
+
+            const customPrompt = document.getElementById('summaryPrompt').value.trim();
+            const selectedModel = document.getElementById('summaryModelSelect').value;
+
+            // Show progress and disable button
+            document.getElementById('summaryProgress').style.display = 'block';
+            document.getElementById('summaryResult').style.display = 'none';
+            document.getElementById('generateSummaryBtn').disabled = true;
+            document.getElementById('summaryProgressText').textContent = '正在开始生成摘要...';
+
+            try {
+                const response = await fetch('/api/summary', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        task_id: currentTaskId,
+                        prompt: customPrompt,
+                        model: selectedModel
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentSummaryId = result.summary_id;
+                    monitorSummaryStatus(result.summary_id);
+                } else {
+                    alert('Summary generation failed: ' + result.error);
+                    document.getElementById('summaryProgress').style.display = 'none';
+                    document.getElementById('generateSummaryBtn').disabled = false;
+                }
+
+            } catch (error) {
+                alert('An error occurred: ' + error.message);
+                document.getElementById('summaryProgress').style.display = 'none';
+                document.getElementById('generateSummaryBtn').disabled = false;
+            }
+        }
+
+        // Variables to store thinking and answer content
+        let currentThinking = "";
+        let currentAnswer = "";
+        let isThinkingMode = false;
+
+        async function monitorSummaryStatus(summaryId) {
+            const maxAttempts = 300; // 5 minutes max
+            let attempts = 0;
+            currentThinking = "";
+            currentAnswer = "";
+            isThinkingMode = false;
+
+            const selectedModel = document.getElementById('summaryModelSelect').value;
+            const isThinkingModelSelected = selectedModel === 'gpt-5-thinking';
+
+            // Reset button states at the start
+            document.getElementById('copyThinkingBtn').style.display = 'none';
+            document.querySelector('#summaryResult .btn[onclick="copySummaryToClipboard()"]').style.width = '100%';
+            document.querySelector('#summaryResult .btn[onclick="copySummaryToClipboard()"]').style.flex = 'none';
+
+            const checkStatus = async () => {
+                try {
+                    const response = await fetch(`/api/summary/status/${summaryId}`);
+                    const status = await response.json();
+
+                    console.log('Summary status update:', status);
+
+                    if (status.status === 'not_found') {
+                        throw new Error('Summary task not found');
+                    }
+
+                    // Update progress text
+                    document.getElementById('summaryProgressText').textContent = status.message || '处理中...';
+
+                    // Show streaming content if available
+                    if (status.partial_summary) {
+                        // Parse thinking vs answer content
+                        parseAndDisplayContent(status.partial_summary, isThinkingModelSelected);
+                    }
+
+                    // Check if completed
+                    if (status.status === 'completed') {
+                        // Parse final content
+                        parseAndDisplayContent(status.summary, isThinkingModelSelected);
+
+                        document.getElementById('summaryProgress').style.display = 'none';
+                        document.getElementById('generateSummaryBtn').disabled = false;
+
+                        // Auto-collapse thinking section after completion
+                        if (isThinkingModelSelected && document.getElementById('thinkingSection').style.display !== 'none') {
+                            setTimeout(() => {
+                                collapseThinking();
+                            }, 2000);
+                        }
+
+                        console.log(`Summary completed in ${Math.round(status.total_time)} seconds`);
+
+                    } else if (status.status === 'failed') {
+                        alert('摘要生成失败: ' + status.message);
+                        document.getElementById('summaryProgress').style.display = 'none';
+                        document.getElementById('generateSummaryBtn').disabled = false;
+
+                    } else {
+                        // Continue monitoring
+                        attempts++;
+                        if (attempts < maxAttempts) {
+                            setTimeout(checkStatus, 1000); // Check every 1 second
+                        } else {
+                            alert('摘要生成超时，请重试');
+                            document.getElementById('summaryProgress').style.display = 'none';
+                            document.getElementById('generateSummaryBtn').disabled = false;
+                        }
+                    }
+
+                } catch (error) {
+                    console.error('Summary status check failed:', error);
+                    attempts++;
+                    if (attempts < maxAttempts) {
+                        setTimeout(checkStatus, 2000);
+                    } else {
+                        alert('无法获取摘要状态，请重试');
+                        document.getElementById('summaryProgress').style.display = 'none';
+                        document.getElementById('generateSummaryBtn').disabled = false;
+                    }
+                }
+            };
+
+            // Start monitoring immediately
+            setTimeout(checkStatus, 500);
+        }
+
+        function parseAndDisplayContent(content, isThinkingModel) {
+            if (isThinkingModel) {
+                // Parse GPT-5 thinking format
+                const thinkingMatch = content.match(/<thinking>([\s\S]*?)<\/thinking>/);
+                let thinking = thinkingMatch ? thinkingMatch[1].trim() : "";
+                let answer = content.replace(/<thinking>[\s\S]*?<\/thinking>/, '').trim();
+
+                // Update thinking section
+                if (thinking && thinking !== currentThinking) {
+                    currentThinking = thinking;
+                    document.getElementById('thinkingSection').style.display = 'block';
+                    document.getElementById('thinkingText').innerHTML = marked.parse(thinking);
+
+                    // Show Copy Thinking button and adjust layout
+                    document.getElementById('copyThinkingBtn').style.display = 'block';
+                    document.querySelector('#summaryResult .btn[onclick="copySummaryToClipboard()"]').style.width = 'auto';
+                    document.querySelector('#summaryResult .btn[onclick="copySummaryToClipboard()"]').style.flex = '1';
+                }
+
+                // Update answer section
+                if (answer && answer !== currentAnswer) {
+                    currentAnswer = answer;
+                    document.getElementById('summaryResult').style.display = 'block';
+                    document.getElementById('answerText').innerHTML = marked.parse(answer);
+                }
+            } else {
+                // For non-thinking models, all content goes to answer
+                if (content !== currentAnswer) {
+                    currentAnswer = content;
+                    document.getElementById('summaryResult').style.display = 'block';
+                    document.getElementById('answerText').innerHTML = marked.parse(content);
+                }
+            }
+        }
+
+        // Toggle functions for collapsible sections
+        function toggleThinking() {
+            const content = document.getElementById('thinkingContent');
+            const button = document.querySelector('#thinkingSection .collapsible');
+            const icon = document.getElementById('thinkingToggleIcon');
+
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+                button.classList.remove('active');
+                icon.textContent = '▶';
+            } else {
+                content.classList.add('active');
+                button.classList.add('active');
+                icon.textContent = '▼';
+            }
+        }
+
+        function toggleAnswer() {
+            const content = document.getElementById('answerContent');
+            const button = document.querySelector('#answerSection .collapsible');
+            const icon = document.getElementById('answerToggleIcon');
+
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+                button.classList.remove('active');
+                icon.textContent = '▶';
+            } else {
+                content.classList.add('active');
+                button.classList.add('active');
+                icon.textContent = '▼';
+            }
+        }
+
+        function collapseThinking() {
+            const content = document.getElementById('thinkingContent');
+            const button = document.querySelector('#thinkingSection .collapsible');
+            const icon = document.getElementById('thinkingToggleIcon');
+
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+                button.classList.remove('active');
+                icon.textContent = '▶';
+            }
+        }
+
+        function copyThinkingToClipboard() {
+            const thinkingText = document.getElementById('thinkingText').textContent || currentThinking;
+
+            if (!thinkingText) {
+                alert('No thinking process available to copy');
+                return;
+            }
+
+            navigator.clipboard.writeText(thinkingText).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                alert('Failed to copy thinking to clipboard');
+            });
+        }
+
+        function copySummaryToClipboard() {
+            const answerText = document.getElementById('answerText').textContent || currentAnswer;
+
+            if (!answerText) {
+                alert('No summary available to copy');
+                return;
+            }
+
+            navigator.clipboard.writeText(answerText).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✅ Copied!';
+
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                alert('Failed to copy summary to clipboard');
             });
         }
     </script>
