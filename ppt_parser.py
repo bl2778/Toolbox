@@ -310,9 +310,15 @@ class TextChunker:
                 chunks.append(chunk)
                 chunk_id += 1
 
-                # Handle overlap: move back by overlap_pages - 1
+                # Handle overlap: move back by overlap_pages - 1, but avoid creating redundant single-page chunks
                 overlap = min(config["overlap_pages"], len(chunk_slides) - 1)
-                i -= overlap
+                # Only apply overlap if we haven't reached the end of all slides
+                if i < len(zd_slides):
+                    # Check if moving back would create a redundant chunk with only the last page(s)
+                    remaining_slides = len(zd_slides) - i
+                    if remaining_slides > overlap:
+                        i -= overlap
+                    # If remaining slides <= overlap, don't move back to avoid redundant chunks
 
         return chunks
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZD Tool - Bain Toolbox</title>
+    <title>Zero-Defect Analysis - Analytics Toolbox</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -258,6 +258,26 @@
             background: #e0a800;
         }
 
+        .zd-recheck-btn {
+            padding: 5px 10px;
+            font-size: 12px;
+            background: #17a2b8;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .zd-recheck-btn:hover {
+            background: #138496;
+        }
+
+        .zd-recheck-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
         .zd-chunk-timing {
             font-size: 11px;
             color: #6c757d;
@@ -414,7 +434,7 @@
     <div class="container">
         <!-- Header -->
         <div class="card">
-            <h1 class="title">🔍 ZD Tool (Zero Defect)</h1>
+            <h1 class="title">Zero-Defect Analysis</h1>
             <p class="subtitle">Check your PowerPoint presentations for spelling mistakes, grammar issues, and logic inconsistencies</p>
 
             <div style="text-align: center; margin-bottom: 20px;">
@@ -426,7 +446,7 @@
 
         <!-- Upload Form -->
         <div class="card" id="uploadForm">
-            <h2>📄 Upload PowerPoint File</h2>
+            <h2>Upload PowerPoint File</h2>
 
             <form id="zdUploadForm" enctype="multipart/form-data">
                 <div class="zd-form-group">
@@ -449,7 +469,7 @@
                             <p>4,000-6,500 words per batch<br>Up to 10 pages per chunk<br>Lower cost, faster processing</p>
                         </div>
                         <div class="zd-mode-card" data-mode="precise">
-                            <h4>🎯 Precise Mode</h4>
+                            <h4>Precise Mode</h4>
                             <p>2,500-4,000 words per batch<br>Up to 5 pages per chunk<br>More thorough cross-page logic checking</p>
                         </div>
                     </div>
@@ -469,14 +489,14 @@
                 </div>
 
                 <button type="submit" class="btn" id="startAnalysisBtn" disabled>
-                    🚀 Start ZD Analysis
+                    Start Analysis
                 </button>
             </form>
         </div>
 
         <!-- Progress Display -->
         <div class="card zd-progress-container" id="progressContainer">
-            <h2>📊 Analysis Progress</h2>
+            <h2>Analysis Progress</h2>
 
             <div class="zd-status-display">
                 <div class="zd-progress-bar">
@@ -508,9 +528,9 @@
         <!-- Results Display -->
         <div class="card zd-results-container" id="resultsContainer">
             <div class="zd-results-header">
-                <h2>📋 Analysis Results</h2>
+                <h2>Analysis Results</h2>
                 <div class="zd-export-buttons">
-                    <button class="btn btn-small" id="exportCsvBtn">📊 Export CSV</button>
+                    <button class="btn btn-small" id="exportCsvBtn">Export CSV</button>
                     <button class="btn btn-small" id="exportExcelBtn">📈 Export Excel</button>
                 </div>
             </div>
@@ -527,7 +547,7 @@
                     Show only logic issues
                 </label>
                 <button class="btn btn-small" onclick="forceShowDebugInfo()" style="margin-left: 15px;">
-                    🔍 Force Debug
+                    Force Debug
                 </button>
             </div>
 
@@ -585,7 +605,7 @@
         function updateFileDisplay() {
             if (fileInput.files.length > 0) {
                 const file = fileInput.files[0];
-                fileSelectText.innerHTML = `📄 ${file.name} (${formatFileSize(file.size)})`;
+                fileSelectText.innerHTML = `${file.name} (${formatFileSize(file.size)})`;
                 startAnalysisBtn.disabled = false;
             }
         }
@@ -790,7 +810,10 @@
                         </div>
                         ${chunkData.error ? `<div style="color: #dc3545; margin-bottom: 10px;"><strong>Error:</strong> ${chunkData.error}</div>` : ''}
                         <div>
-                            <strong>AI Streaming Output:</strong>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <strong>AI Streaming Output:</strong>
+                                ${chunkData.status === 'completed' ? `<button class="zd-recheck-btn" onclick="recheckChunk('${chunkId}', event)" id="recheck-${chunkId}">🔄 Re-check</button>` : ''}
+                            </div>
                             <div class="zd-format-toggle">
                                 <label>
                                     <input type="radio" name="format-${chunkId}" value="raw" checked onchange="toggleOutputFormat('${chunkId}', 'raw')">
@@ -849,7 +872,10 @@
                     </div>
                     ${chunkData.error ? `<div style="color: #dc3545; margin-bottom: 10px;"><strong>Error:</strong> ${chunkData.error}</div>` : ''}
                     <div>
-                        <strong>AI Streaming Output:</strong>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <strong>AI Streaming Output:</strong>
+                            ${chunkData.status === 'completed' ? `<button class="zd-recheck-btn" onclick="recheckChunk('${chunkId}', event)" id="recheck-${chunkId}">🔄 Re-check</button>` : ''}
+                        </div>
                         <div class="zd-format-toggle">
                             <label>
                                 <input type="radio" name="format-${chunkId}" value="raw" checked onchange="toggleOutputFormat('${chunkId}', 'raw')">
@@ -891,6 +917,7 @@
                     document.querySelector(`#chunk-${chunkId} .zd-chunk-progress`) : null;
                 const streamingOutput = document.getElementById(`streaming-${chunkId}`);
                 const timing = document.getElementById(`timing-${chunkId}`);
+                const recheckBtn = document.getElementById(`recheck-${chunkId}`);
 
                 if (header) {
                     // Update header status class
@@ -900,6 +927,28 @@
                 if (progressSpan) {
                     // Update progress text
                     progressSpan.textContent = chunkData.ai_progress || getStatusText(chunkData.status);
+                }
+
+                // Update re-check button visibility and state
+                if (recheckBtn) {
+                    if (chunkData.status === 'completed') {
+                        recheckBtn.style.display = 'block';
+                        recheckBtn.disabled = false;
+                        recheckBtn.textContent = '🔄 Re-check';
+                    } else {
+                        recheckBtn.style.display = 'none';
+                    }
+                } else if (chunkData.status === 'completed') {
+                    // Button doesn't exist but chunk is completed, add it
+                    const outputHeader = document.querySelector(`#details-${chunkId} div div`);
+                    if (outputHeader && !outputHeader.querySelector('.zd-recheck-btn')) {
+                        const button = document.createElement('button');
+                        button.className = 'zd-recheck-btn';
+                        button.id = `recheck-${chunkId}`;
+                        button.innerHTML = '🔄 Re-check';
+                        button.onclick = (e) => recheckChunk(chunkId, e);
+                        outputHeader.appendChild(button);
+                    }
                 }
 
                 if (streamingOutput) {
@@ -936,8 +985,8 @@
                 'starting': '🔄',
                 'sending': '📤',
                 'processing': '⚡',
-                'completed': '✅',
-                'failed': '❌'
+                'completed': 'Completed',
+                'failed': 'Failed'
             };
             return icons[status] || '⏳';
         }
@@ -1010,6 +1059,52 @@
                 .catch(error => {
                     alert(`Retry failed: ${error.message}`);
                 });
+            }
+        }
+
+        async function recheckChunk(chunkId, event) {
+            event.stopPropagation(); // Prevent toggle
+
+            if (confirm(`Re-check chunk ${chunkId.replace('ck_', '')}? This will send the chunk content to AI again and replace the existing result.`)) {
+                const recheckBtn = document.getElementById(`recheck-${chunkId}`);
+                const streamingOutput = document.getElementById(`streaming-${chunkId}`);
+
+                try {
+                    // Disable button and show processing state
+                    recheckBtn.disabled = true;
+                    recheckBtn.textContent = '🔄 Re-checking...';
+
+                    // Clear current output and show loading
+                    streamingOutput.textContent = 'Re-checking chunk...';
+                    streamingOutput.className = 'zd-streaming-output empty';
+
+                    // Update chunk header to show processing state
+                    const header = document.querySelector(`#chunk-${chunkId} .zd-chunk-header`);
+                    const progressSpan = document.querySelector(`#chunk-${chunkId} .zd-chunk-progress`);
+                    if (header) header.className = 'zd-chunk-header processing';
+                    if (progressSpan) progressSpan.textContent = 'Re-checking...';
+
+                    // Make API call
+                    const response = await fetch(`/api/zd/jobs/${currentJobId}/chunks/${chunkId}/recheck`, {
+                        method: 'POST'
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        // Success - button will be re-enabled when status updates come through polling
+                        recheckBtn.textContent = '🔄 Re-check';
+                    } else {
+                        throw new Error(data.error || 'Re-check failed');
+                    }
+                } catch (error) {
+                    // Error - restore button state
+                    recheckBtn.disabled = false;
+                    recheckBtn.textContent = '🔄 Re-check';
+                    streamingOutput.textContent = `Re-check failed: ${error.message}`;
+                    streamingOutput.className = 'zd-streaming-output';
+                    alert(`Re-check failed: ${error.message}`);
+                }
             }
         }
 
@@ -1097,7 +1192,7 @@
                             outputText += `  Page ${row.page_number}: Spelling="${row.spelling}" Grammar="${row.grammar}" Logic="${row.logic}"\n`;
                         });
                     } else {
-                        outputText += `❌ NO ROWS PARSED!\n`;
+                        outputText += `ERROR: NO ROWS PARSED!\n`;
                     }
                     outputText += `\n`;
                 }
