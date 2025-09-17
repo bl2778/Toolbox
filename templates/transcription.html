@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Transcription - Bain Toolbox</title>
+    <title>Audio Transcription - Analytics Toolbox</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -92,12 +92,12 @@
     <div class="container">
         <!-- Header -->
         <div class="card">
-            <h1 class="title">🎤 Audio Transcription</h1>
-            <p class="subtitle">Upload your client interview recordings for AI-powered transcription</p>
+            <h1 class="title">Audio Transcription</h1>
+            <p class="subtitle">Transform client interview recordings into professional transcripts with AI-powered precision</p>
 
             <div style="text-align: center; margin-bottom: 20px;">
-                <a href="/dashboard" class="btn" style="display: inline-block; width: auto; background: #6c757d;">
-                    ← Back to Dashboard
+                <a href="/dashboard" class="btn" style="display: inline-block; width: auto; background: var(--gray-600);">
+                    Back to Dashboard
                 </a>
             </div>
         </div>
@@ -108,7 +108,6 @@
 
             <!-- File Upload Area -->
             <div class="file-upload-area" id="uploadArea">
-                <div class="upload-icon">📁</div>
                 <div class="upload-text">
                     <strong>Drag & drop your audio file here</strong><br>
                     or <strong>click to select</strong>
@@ -143,7 +142,7 @@
                 <textarea id="customPrompt"
                           class="form-input"
                           rows="3"
-                          placeholder="Leave empty to use default: 'You are a Bain & Company consultant, just had an interview with your client, pls transcribe with timestamp'"></textarea>
+                          placeholder="Leave empty to use default professional transcription prompt"></textarea>
             </div>
 
             <!-- Action Buttons -->
@@ -183,19 +182,19 @@
 
             <div style="margin-top: 20px; text-align: center; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
                 <button type="button" class="btn" id="copyBtn" onclick="copyToClipboard()">
-                    📋 Copy to Clipboard
+                    Copy to Clipboard
                 </button>
                 <button type="button" class="btn" id="editBtn" onclick="toggleEdit()" style="background: #3498db;">
-                    ✏️ Edit
+                    Edit
                 </button>
                 <button type="button" class="btn" id="saveBtn" onclick="saveEdit()" style="background: #27ae60; display: none;">
-                    💾 Save
+                    Save
                 </button>
                 <button type="button" class="btn" id="cancelBtn" onclick="cancelEdit()" style="background: #e74c3c; display: none;">
-                    ❌ Cancel
+                    Cancel
                 </button>
                 <button type="button" class="btn" id="summaryBtn" onclick="startSummary()" style="background: #9b59b6;">
-                    🤖 Auto Summary
+                    Auto Summary
                 </button>
             </div>
         </div>
@@ -222,8 +221,7 @@
                     <div class="card" id="uploadSectionSummary" style="display: none;">
                         <h2 style="margin-bottom: 20px; color: #333;">Upload Audio File</h2>
                         <div class="file-upload-area" id="uploadAreaSummary">
-                            <div class="upload-icon">📁</div>
-                            <div class="upload-text">
+                                        <div class="upload-text">
                                 <strong>Drag & drop your audio file here</strong><br>
                                 or <strong>click to select</strong>
                                 <br><br>
@@ -245,7 +243,7 @@
                 <!-- Right Column: Summary Panel -->
                 <div style="flex: 1;">
                     <div class="card" style="height: fit-content;">
-                        <h2 style="margin-bottom: 20px; color: #333;">🤖 AI Summary</h2>
+                        <h2 style="margin-bottom: 1.5rem; color: var(--navy-800); font-weight: 600;">AI Summary</h2>
 
                         <!-- Model Selection -->
                         <div class="form-group" style="margin-bottom: 15px;">
@@ -266,7 +264,7 @@
                                       class="form-input"
                                       rows="6"
                                       style="resize: vertical;"
-                                      placeholder="Loading default prompt...">You are a McKinsey consultant, now helping client doing a project. Now you just had an interview, can you pls summarize the key takeaways using McKinsey wording style. Pls output in Email ready format with two sections a) Executive Summaries b) Details. The summary should exactly follow what was discussed in transcript, pls don't imagine.</textarea>
+                                      placeholder="Loading default prompt...">You are a professional consultant, now helping a client with their project. You just had an interview, can you please summarize the key takeaways using professional consulting language. Please output in email-ready format with two sections: a) Executive Summary b) Details. The summary should exactly follow what was discussed in the transcript, please don't imagine.</textarea>
                             <small style="color: #666; display: block; margin-top: 5px;">
                                 Note: The transcript will be automatically appended after your prompt.
                             </small>
@@ -274,7 +272,7 @@
 
                         <!-- Generate Button -->
                         <button type="button" class="btn" id="generateSummaryBtn" onclick="generateSummary()" style="background: #9b59b6; margin-bottom: 20px; width: 100%;">
-                            🚀 Generate Summary
+                            Generate Summary
                         </button>
 
                         <!-- Summary Progress -->
@@ -287,7 +285,7 @@
                         <!-- Thinking Process Section -->
                         <div id="thinkingSection" style="display: none; margin-bottom: 20px;">
                             <button class="collapsible active" onclick="toggleThinking()">
-                                <span>🤔 Thought</span>
+                                <span>Thought Process</span>
                                 <span id="thinkingToggleIcon" style="float: right;">▼</span>
                             </button>
                             <div class="collapsible-content active" id="thinkingContent">
@@ -298,7 +296,7 @@
                         <!-- Final Summary Section -->
                         <div id="summaryResult" style="display: none;">
                             <button class="collapsible active" onclick="toggleAnswer()">
-                                <span>💡 Final Summary</span>
+                                <span>Final Summary</span>
                                 <span id="answerToggleIcon" style="float: right;">▼</span>
                             </button>
                             <div class="collapsible-content active" id="answerContent">
@@ -307,10 +305,10 @@
 
                             <div style="margin-top: 15px; text-align: center; display: flex; gap: 10px;">
                                 <button type="button" class="btn" id="copyThinkingBtn" onclick="copyThinkingToClipboard()" style="background: #3498db; flex: 1; display: none;">
-                                    📋 Copy Thinking
+                                    Copy Thinking
                                 </button>
                                 <button type="button" class="btn" onclick="copySummaryToClipboard()" style="background: #27ae60; width: 100%;">
-                                    📋 Copy Summary
+                                    Copy Summary
                                 </button>
                             </div>
                         </div>
@@ -396,7 +394,6 @@
 
             // Update upload area appearance
             uploadArea.innerHTML = `
-                <div class="upload-icon">✅</div>
                 <div class="upload-text">
                     <strong>File ready for transcription</strong><br>
                     <small>Click here to select a different file</small>
@@ -427,7 +424,6 @@
 
             // Reset upload area
             uploadArea.innerHTML = `
-                <div class="upload-icon">📁</div>
                 <div class="upload-text">
                     <strong>Drag & drop your audio file here</strong><br>
                     or <strong>click to select</strong>
@@ -662,7 +658,7 @@
                     // Show success message
                     const saveBtn = document.getElementById('saveBtn');
                     const originalText = saveBtn.textContent;
-                    saveBtn.textContent = '✅ Saved!';
+                    saveBtn.textContent = 'Saved!';
                     setTimeout(() => {
                         saveBtn.textContent = originalText;
                     }, 2000);
@@ -685,7 +681,7 @@
             navigator.clipboard.writeText(textToCopy).then(() => {
                 const copyBtn = document.getElementById('copyBtn');
                 const originalText = copyBtn.textContent;
-                copyBtn.textContent = '✅ Copied!';
+                copyBtn.textContent = 'Copied!';
                 copyBtn.style.background = '#27ae60';
 
                 setTimeout(() => {
@@ -998,7 +994,7 @@
             navigator.clipboard.writeText(thinkingText).then(() => {
                 const btn = event.target;
                 const originalText = btn.textContent;
-                btn.textContent = '✅ Copied!';
+                btn.textContent = 'Copied!';
 
                 setTimeout(() => {
                     btn.textContent = originalText;
@@ -1019,7 +1015,7 @@
             navigator.clipboard.writeText(answerText).then(() => {
                 const btn = event.target;
                 const originalText = btn.textContent;
-                btn.textContent = '✅ Copied!';
+                btn.textContent = 'Copied!';
 
                 setTimeout(() => {
                     btn.textContent = originalText;

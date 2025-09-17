@@ -3,28 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bain Toolbox - Authentication</title>
+    <title>Analytics Toolbox - Secure Access</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
         <div class="card">
-            <h1 class="title">🔧 Bain Toolbox</h1>
-            <p class="subtitle">Please enter the access password to continue</p>
+            <h1 class="title">Analytics Toolbox</h1>
+            <p class="subtitle">Secure access to professional consulting tools</p>
 
             <form method="POST" action="/auth">
                 <div class="form-group">
-                    <label for="password" class="form-label">Access Password:</label>
+                    <label for="password" class="form-label">Access Credentials</label>
                     <input type="password"
                            id="password"
                            name="password"
                            class="form-input"
-                           placeholder="Enter password"
+                           placeholder="Enter secure access key"
                            required
                            autocomplete="current-password">
                 </div>
 
-                <button type="submit" class="btn">Access Toolbox</button>
+                <button type="submit" class="btn">Access Dashboard</button>
             </form>
 
             {% if error %}

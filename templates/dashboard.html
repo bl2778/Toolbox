@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bain Toolbox - Dashboard</title>
+    <title>Analytics Toolbox - Professional Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -11,44 +11,39 @@
 
     <div class="container">
         <div class="card">
-            <h1 class="title">🔧 Bain Toolbox</h1>
-            <p class="subtitle">Welcome to your consulting toolkit</p>
+            <h1 class="title">Analytics Toolbox</h1>
+            <p class="subtitle">Professional tools for sophisticated analysis and client deliverables</p>
 
             <div class="tool-grid">
                 <div class="tool-card" onclick="location.href='/transcription'">
-                    <div class="tool-icon">🎤</div>
                     <div class="tool-title">Audio Transcription</div>
                     <div class="tool-description">
-                        Convert client interview recordings to text with timestamp.
-                        Supports multiple audio formats including MP3, WAV, and M4A.
+                        Transform client interview recordings into professional transcripts with precise timestamps.
+                        Supports all major audio formats with AI-powered accuracy.
                     </div>
                 </div>
 
-                <!-- ZD Tool - now available -->
                 <div class="tool-card" onclick="location.href='/zd-tool'">
-                    <div class="tool-icon">🔍</div>
-                    <div class="tool-title">ZD Tool (Zero Defect)</div>
+                    <div class="tool-title">Zero-Defect Analysis</div>
                     <div class="tool-description">
-                        Check PowerPoint presentations for spelling mistakes, grammar issues, and logic inconsistencies.
-                        Supports fast and precise analysis modes with multiple AI models.
+                        Comprehensive quality assurance for presentation materials. Identifies spelling, grammar, and logical inconsistencies
+                        with enterprise-grade precision across multiple analysis modes.
                     </div>
                 </div>
 
                 <div class="tool-card" style="opacity: 0.5; cursor: not-allowed;">
-                    <div class="tool-icon">📄</div>
-                    <div class="tool-title">Meeting Summary</div>
+                    <div class="tool-title">Executive Summary</div>
                     <div class="tool-description">
-                        Generate structured meeting notes and action items.
+                        Automated generation of structured meeting notes and strategic action items with intelligent prioritization.
                         <br><br><small style="color: #999;">Coming Soon</small>
                     </div>
                 </div>
 
-                <div class="tool-card" style="opacity: 0.5; cursor: not-allowed;">
-                    <div class="tool-icon">🧾</div>
-                    <div class="tool-title">Invoice Processor</div>
+                <div class="tool-card" onclick="location.href='/invoice-processor'">
+                    <div class="tool-title">Document Processor</div>
                     <div class="tool-description">
-                        Extract and organize data from invoices and receipts.
-                        <br><br><small style="color: #999;">Coming Soon</small>
+                        Intelligent batch processing for financial documents and invoices. Automated data extraction,
+                        validation, and professional formatting for seamless expense management.
                     </div>
                 </div>
             </div>
