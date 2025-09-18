@@ -5,259 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wording Revision</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        body {
-            background: #f5f7fb;
-        }
-        .wr-container {
-            max-width: 1100px;
-            margin: 40px auto;
-        }
-        .wr-card {
-            background: #fff;
-            border-radius: 18px;
-            box-shadow: 0 20px 45px rgba(16, 36, 94, 0.08);
-            padding: 32px;
-            margin-bottom: 24px;
-        }
-        .wr-title {
-            font-size: 28px;
-            font-weight: 700;
-            color: #1b2559;
-            margin-bottom: 8px;
-        }
-        .wr-subtitle {
-            color: #4d5875;
-            margin-bottom: 24px;
-        }
-        .wr-dropzone {
-            border: 2px dashed #b9c4f5;
-            border-radius: 16px;
-            padding: 28px;
-            text-align: center;
-            transition: border-color 0.2s ease, background 0.2s ease;
-            cursor: pointer;
-            background: #f9fbff;
-        }
-        .wr-dropzone.dragover {
-            border-color: #4a6cf7;
-            background: #eef2ff;
-        }
-        .wr-dropzone input[type="file"] {
-            display: none;
-        }
-        .wr-file-info {
-            margin-top: 12px;
-            color: #1b2559;
-            font-weight: 600;
-        }
-        .wr-mode-selector {
-            display: flex;
-            gap: 16px;
-            margin: 24px 0;
-        }
-        .wr-mode-option {
-            flex: 1;
-            border: 1px solid #d7def3;
-            border-radius: 14px;
-            padding: 16px;
-            cursor: pointer;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-        .wr-mode-option.active {
-            border-color: #4a6cf7;
-            box-shadow: 0 10px 30px rgba(74, 108, 247, 0.15);
-        }
-        .wr-mode-title {
-            font-weight: 700;
-            color: #1b2559;
-            margin-bottom: 6px;
-        }
-        .wr-mode-desc {
-            color: #556080;
-            font-size: 14px;
-        }
-        .wr-model-select {
-            margin-bottom: 24px;
-        }
-        .wr-model-select label {
-            font-weight: 600;
-            color: #1b2559;
-            display: block;
-            margin-bottom: 6px;
-        }
-        .wr-model-select select {
-            width: 100%;
-            padding: 12px 14px;
-            border-radius: 12px;
-            border: 1px solid #cfd6ec;
-            font-size: 15px;
-        }
-        .wr-primary-btn {
-            background: linear-gradient(135deg, #4a6cf7, #6a8dff);
-            color: #fff;
-            border: none;
-            border-radius: 14px;
-            padding: 14px 24px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-            width: 100%;
-        }
-        .wr-primary-btn:hover {
-            transform: translateY(-1px);
-        }
-        .wr-stages {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 24px;
-            flex-wrap: wrap;
-        }
-        .wr-stage {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 16px;
-            border-radius: 30px;
-            background: #eef1ff;
-            color: #4d5875;
-            font-size: 14px;
-        }
-        .wr-stage.active {
-            background: #4a6cf7;
-            color: #fff;
-        }
-        .wr-stage.complete {
-            background: #2ecc71;
-            color: #fff;
-        }
-        .wr-progress-bar {
-            height: 10px;
-            border-radius: 8px;
-            background: #e3e7f5;
-            overflow: hidden;
-            margin-bottom: 20px;
-        }
-        .wr-progress-fill {
-            height: 100%;
-            background: linear-gradient(135deg, #4a6cf7, #6a8dff);
-            width: 0;
-            transition: width 0.3s ease;
-        }
-        .wr-chunks-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .wr-chunk-card {
-            border: 1px solid #e1e6f6;
-            border-radius: 16px;
-            padding: 16px;
-            background: #fff;
-        }
-        .wr-chunk-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .wr-chunk-title {
-            font-weight: 600;
-            color: #1b2559;
-        }
-        .wr-chunk-status {
-            font-size: 14px;
-            color: #556080;
-        }
-        .wr-chunk-body {
-            color: #4d5875;
-            font-size: 14px;
-            line-height: 1.4;
-        }
-        .wr-streaming {
-            margin-top: 8px;
-            background: #f5f7ff;
-            border-radius: 10px;
-            padding: 10px;
-            white-space: pre-wrap;
-            color: #1f2a4d;
-        }
-        .wr-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-        }
-        .wr-secondary-btn {
-            border: 1px solid #c7d0ef;
-            background: #f6f8ff;
-            border-radius: 10px;
-            padding: 8px 12px;
-            font-size: 13px;
-            cursor: pointer;
-        }
-        .wr-secondary-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .wr-results-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-        }
-        .wr-results-search {
-            flex: 1;
-        }
-        .wr-results-search input {
-            width: 100%;
-            padding: 12px 14px;
-            border-radius: 12px;
-            border: 1px solid #cfd6ec;
-        }
-        .wr-download-buttons {
-            display: flex;
-            gap: 10px;
-        }
-        .wr-results-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .wr-results-table th,
-        .wr-results-table td {
-            border: 1px solid #e3e7f5;
-            padding: 12px;
-            text-align: left;
-        }
-        .wr-results-table th {
-            background: #f3f5ff;
-            color: #1b2559;
-        }
-        .wr-empty {
-            padding: 24px;
-            border-radius: 14px;
-            background: #f7f9ff;
-            color: #4d5875;
-            text-align: center;
-            border: 1px dashed #c7d0ef;
-        }
-        .wr-error {
-            padding: 16px;
-            border-radius: 12px;
-            background: #ffecec;
-            border: 1px solid #ffb4b4;
-            color: #a94442;
-            margin-bottom: 16px;
-        }
-    </style>
-</head>
+    </head>
 <body>
-    <a href="/dashboard" class="logout-btn" style="left: 24px; right: auto;">← Back</a>
-    <a href="/logout" class="logout-btn">Logout</a>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="container header-container">
+                <a href="/dashboard" class="app-brand" aria-label="Bain Toolbox home">
+                    <span class="app-brand-mark" aria-hidden="true">🔧</span>
+                    <span class="app-brand-text">Bain Toolbox</span>
+                </a>
+                <nav class="app-nav" aria-label="Primary navigation">
+                    <a href="/dashboard" class="nav-link">Dashboard</a>
+                    <a href="/transcription" class="nav-link">Transcription</a>
+                    <a href="/zd-tool" class="nav-link">Zero-Defect</a>
+                    <a href="/logout" class="nav-link logout-btn">Logout</a>
+                </nav>
+            </div>
+        </header>
 
-    <div class="wr-container">
+        <main class="app-main container wr-container">
         <div class="wr-card">
             <div class="wr-title">Wording Revision</div>
             <div class="wr-subtitle">Upload a PPTX deck to polish English wording slide by slide.</div>
@@ -329,6 +95,13 @@
                 <tbody></tbody>
             </table>
         </div>
+        </main>
+
+        <footer class="app-footer">
+            <div class="container footer">
+                <p>© 2024 Bain Toolbox. All rights reserved.</p>
+            </div>
+        </footer>
     </div>
 
     <script>

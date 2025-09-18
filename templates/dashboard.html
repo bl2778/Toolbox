@@ -7,12 +7,25 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <a href="/logout" class="logout-btn">Logout</a>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="container header-container">
+                <a href="/dashboard" class="app-brand" aria-label="Bain Toolbox home">
+                    <span class="app-brand-mark" aria-hidden="true">🔧</span>
+                    <span class="app-brand-text">Bain Toolbox</span>
+                </a>
+                <nav class="app-nav" aria-label="Primary navigation">
+                    <a href="/dashboard" class="nav-link" aria-current="page">Dashboard</a>
+                    <a href="/logout" class="nav-link logout-btn">Logout</a>
+                </nav>
+            </div>
+        </header>
 
-    <div class="container">
-        <div class="card">
-            <h1 class="title">Analytics Toolbox</h1>
-            <p class="subtitle">Professional tools for sophisticated analysis and client deliverables</p>
+        <main class="app-main container">
+            <header class="card page-header">
+                <h1 class="title">Analytics Toolbox</h1>
+                <p class="subtitle">Professional tools for sophisticated analysis and client deliverables</p>
+            </header>
 
             <div class="tool-grid">
                 <div class="tool-card" onclick="location.href='/transcription'">
@@ -46,7 +59,13 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
+
+        <footer class="app-footer">
+            <div class="container footer">
+                <p>© 2024 Bain Toolbox. All rights reserved.</p>
+            </div>
+        </footer>
     </div>
 
     <script>
