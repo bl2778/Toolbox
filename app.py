@@ -13,6 +13,7 @@ import signal
 from dotenv import load_dotenv
 import json
 from ppt_parser import extract_ppt_for_zd
+from wr.api import wr_bp
 import openpyxl
 from openpyxl.utils.dataframe import dataframe_to_rows
 import pandas as pd
@@ -24,6 +25,8 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-here')
+
+app.register_blueprint(wr_bp)
 
 # Configuration
 ACCESS_PASSWORD = "BAIN2025"
@@ -130,6 +133,12 @@ def zd_tool():
     if not is_authenticated():
         return redirect(url_for('index'))
     return render_template('zd_tool.html')
+
+@app.route('/wr')
+def wr_tool_page():
+    if not is_authenticated():
+        return redirect(url_for('index'))
+    return render_template('wr_tool.html')
 
 @app.route('/invoice-processor')
 def invoice_processor_page():

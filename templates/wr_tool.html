@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wording Revision</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body {
+            background: #f5f7fb;
+        }
+        .wr-container {
+            max-width: 1100px;
+            margin: 40px auto;
+        }
+        .wr-card {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 20px 45px rgba(16, 36, 94, 0.08);
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+        .wr-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1b2559;
+            margin-bottom: 8px;
+        }
+        .wr-subtitle {
+            color: #4d5875;
+            margin-bottom: 24px;
+        }
+        .wr-dropzone {
+            border: 2px dashed #b9c4f5;
+            border-radius: 16px;
+            padding: 28px;
+            text-align: center;
+            transition: border-color 0.2s ease, background 0.2s ease;
+            cursor: pointer;
+            background: #f9fbff;
+        }
+        .wr-dropzone.dragover {
+            border-color: #4a6cf7;
+            background: #eef2ff;
+        }
+        .wr-dropzone input[type="file"] {
+            display: none;
+        }
+        .wr-file-info {
+            margin-top: 12px;
+            color: #1b2559;
+            font-weight: 600;
+        }
+        .wr-mode-selector {
+            display: flex;
+            gap: 16px;
+            margin: 24px 0;
+        }
+        .wr-mode-option {
+            flex: 1;
+            border: 1px solid #d7def3;
+            border-radius: 14px;
+            padding: 16px;
+            cursor: pointer;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .wr-mode-option.active {
+            border-color: #4a6cf7;
+            box-shadow: 0 10px 30px rgba(74, 108, 247, 0.15);
+        }
+        .wr-mode-title {
+            font-weight: 700;
+            color: #1b2559;
+            margin-bottom: 6px;
+        }
+        .wr-mode-desc {
+            color: #556080;
+            font-size: 14px;
+        }
+        .wr-model-select {
+            margin-bottom: 24px;
+        }
+        .wr-model-select label {
+            font-weight: 600;
+            color: #1b2559;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .wr-model-select select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid #cfd6ec;
+            font-size: 15px;
+        }
+        .wr-primary-btn {
+            background: linear-gradient(135deg, #4a6cf7, #6a8dff);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            padding: 14px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            width: 100%;
+        }
+        .wr-primary-btn:hover {
+            transform: translateY(-1px);
+        }
+        .wr-stages {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .wr-stage {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 30px;
+            background: #eef1ff;
+            color: #4d5875;
+            font-size: 14px;
+        }
+        .wr-stage.active {
+            background: #4a6cf7;
+            color: #fff;
+        }
+        .wr-stage.complete {
+            background: #2ecc71;
+            color: #fff;
+        }
+        .wr-progress-bar {
+            height: 10px;
+            border-radius: 8px;
+            background: #e3e7f5;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .wr-progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #4a6cf7, #6a8dff);
+            width: 0;
+            transition: width 0.3s ease;
+        }
+        .wr-chunks-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .wr-chunk-card {
+            border: 1px solid #e1e6f6;
+            border-radius: 16px;
+            padding: 16px;
+            background: #fff;
+        }
+        .wr-chunk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .wr-chunk-title {
+            font-weight: 600;
+            color: #1b2559;
+        }
+        .wr-chunk-status {
+            font-size: 14px;
+            color: #556080;
+        }
+        .wr-chunk-body {
+            color: #4d5875;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .wr-streaming {
+            margin-top: 8px;
+            background: #f5f7ff;
+            border-radius: 10px;
+            padding: 10px;
+            white-space: pre-wrap;
+            color: #1f2a4d;
+        }
+        .wr-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .wr-secondary-btn {
+            border: 1px solid #c7d0ef;
+            background: #f6f8ff;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .wr-secondary-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .wr-results-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .wr-results-search {
+            flex: 1;
+        }
+        .wr-results-search input {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid #cfd6ec;
+        }
+        .wr-download-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .wr-results-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .wr-results-table th,
+        .wr-results-table td {
+            border: 1px solid #e3e7f5;
+            padding: 12px;
+            text-align: left;
+        }
+        .wr-results-table th {
+            background: #f3f5ff;
+            color: #1b2559;
+        }
+        .wr-empty {
+            padding: 24px;
+            border-radius: 14px;
+            background: #f7f9ff;
+            color: #4d5875;
+            text-align: center;
+            border: 1px dashed #c7d0ef;
+        }
+        .wr-error {
+            padding: 16px;
+            border-radius: 12px;
+            background: #ffecec;
+            border: 1px solid #ffb4b4;
+            color: #a94442;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <a href="/dashboard" class="logout-btn" style="left: 24px; right: auto;">← Back</a>
+    <a href="/logout" class="logout-btn">Logout</a>
+
+    <div class="wr-container">
+        <div class="wr-card">
+            <div class="wr-title">Wording Revision</div>
+            <div class="wr-subtitle">Upload a PPTX deck to polish English wording slide by slide.</div>
+
+            <form id="wrUploadForm">
+                <div class="wr-dropzone" id="wrDropzone">
+                    <input type="file" id="wrFileInput" accept=".pptx">
+                    <div id="wrDropText">Drop PPTX here or click to browse</div>
+                    <div class="wr-file-info" id="wrFileInfo" style="display:none;"></div>
+                </div>
+
+                <div class="wr-mode-selector">
+                    <div class="wr-mode-option active" data-mode="fast">
+                        <div class="wr-mode-title">Fast</div>
+                        <div class="wr-mode-desc">4k–6.5k words · up to 15 pages per chunk</div>
+                    </div>
+                    <div class="wr-mode-option" data-mode="precise">
+                        <div class="wr-mode-title">Precise</div>
+                        <div class="wr-mode-desc">2.5k–4k words · up to 8 pages per chunk</div>
+                    </div>
+                </div>
+
+                <div class="wr-model-select">
+                    <label for="wrModelSelect">Model</label>
+                    <select id="wrModelSelect">
+                        <option value="gpt-5-pro" selected>GPT-5 Pro (recommended)</option>
+                        <option value="gpt-5">GPT-5</option>
+                        <option value="gpt-5-thinking">GPT-5 Thinking</option>
+                        <option value="gpt-4.5">GPT-4.5</option>
+                        <option value="gpt-4">GPT-4</option>
+                    </select>
+                </div>
+
+                <button class="wr-primary-btn" type="submit">Start Revision</button>
+            </form>
+        </div>
+
+        <div class="wr-card" id="wrStatusCard" style="display:none;">
+            <div id="wrError" class="wr-error" style="display:none;"></div>
+            <div class="wr-stages">
+                <div class="wr-stage" data-stage="PARSING">1. Parsing PPT</div>
+                <div class="wr-stage" data-stage="PROMPTING">2. Sending Prompts</div>
+                <div class="wr-stage" data-stage="THINKING">3. AI Thinking</div>
+                <div class="wr-stage" data-stage="MERGING">4. Merging Results</div>
+            </div>
+            <div class="wr-progress-bar"><div class="wr-progress-fill" id="wrProgressFill"></div></div>
+            <div class="wr-chunks-list" id="wrChunksList"></div>
+        </div>
+
+        <div class="wr-card" id="wrResultsCard" style="display:none;">
+            <div class="wr-results-controls">
+                <div class="wr-results-search">
+                    <input type="text" id="wrSearchInput" placeholder="Search by page or text...">
+                </div>
+                <div class="wr-download-buttons">
+                    <button class="wr-secondary-btn" id="wrDownloadCsv">Download CSV</button>
+                    <button class="wr-secondary-btn" id="wrDownloadXlsx">Download XLSX</button>
+                </div>
+            </div>
+            <div id="wrResultsEmpty" class="wr-empty" style="display:none;">All reviewed content already meets Bain standards. No edits recommended.</div>
+            <table class="wr-results-table" id="wrResultsTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>Page</th>
+                        <th>Original</th>
+                        <th>Revised</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const dropzone = document.getElementById('wrDropzone');
+        const fileInput = document.getElementById('wrFileInput');
+        const fileInfo = document.getElementById('wrFileInfo');
+        const uploadForm = document.getElementById('wrUploadForm');
+        const modeOptions = document.querySelectorAll('.wr-mode-option');
+        const modelSelect = document.getElementById('wrModelSelect');
+        const statusCard = document.getElementById('wrStatusCard');
+        const resultsCard = document.getElementById('wrResultsCard');
+        const chunksList = document.getElementById('wrChunksList');
+        const progressFill = document.getElementById('wrProgressFill');
+        const resultsTable = document.getElementById('wrResultsTable');
+        const resultsEmpty = document.getElementById('wrResultsEmpty');
+        const searchInput = document.getElementById('wrSearchInput');
+        const downloadCsv = document.getElementById('wrDownloadCsv');
+        const downloadXlsx = document.getElementById('wrDownloadXlsx');
+        const errorBanner = document.getElementById('wrError');
+
+        let currentFile = null;
+        let currentMode = 'fast';
+        let currentJobId = null;
+        let pollingTimer = null;
+        let currentResults = [];
+
+        function escapeHtml(value) {
+            if (value === undefined || value === null) return '';
+            return value
+                .toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+        }
+
+        function resetUI() {
+            if (pollingTimer) {
+                clearInterval(pollingTimer);
+                pollingTimer = null;
+            }
+            statusCard.style.display = 'none';
+            resultsCard.style.display = 'none';
+            chunksList.innerHTML = '';
+            progressFill.style.width = '0%';
+            errorBanner.style.display = 'none';
+            document.querySelectorAll('.wr-stage').forEach(stage => {
+                stage.classList.remove('active', 'complete');
+            });
+        }
+
+        dropzone.addEventListener('click', () => fileInput.click());
+        dropzone.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+        dropzone.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropzone.classList.remove('dragover');
+            const file = event.dataTransfer.files[0];
+            if (file && file.name.endsWith('.pptx')) {
+                fileInput.files = event.dataTransfer.files;
+                currentFile = file;
+                fileInfo.textContent = `${file.name} · ${formatBytes(file.size)}`;
+                fileInfo.style.display = 'block';
+            }
+        });
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (file) {
+                currentFile = file;
+                fileInfo.textContent = `${file.name} · ${formatBytes(file.size)}`;
+                fileInfo.style.display = 'block';
+            }
+        });
+
+        modeOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                modeOptions.forEach(opt => opt.classList.remove('active'));
+                option.classList.add('active');
+                currentMode = option.getAttribute('data-mode');
+            });
+        });
+
+        function setStage(status, job) {
+            const stageMap = {
+                'UPLOADING': 'PARSING',
+                'PARSING': 'PARSING',
+                'CHUNKING': 'PARSING',
+                'PROMPTING': 'PROMPTING',
+                'PROMPTING/THINKING': 'THINKING',
+                'THINKING': 'THINKING',
+                'MERGING': 'MERGING',
+                'DONE': 'MERGING'
+            };
+            const normalizedStatus = stageMap[status] || status;
+            const stages = ['PARSING', 'PROMPTING', 'THINKING', 'MERGING'];
+            const thinkingStage = document.querySelector('.wr-stage[data-stage="THINKING"]');
+            if (thinkingStage) {
+                thinkingStage.textContent = '3. AI Thinking';
+            }
+            stages.forEach(stageKey => {
+                const stageEl = document.querySelector(`.wr-stage[data-stage="${stageKey}"]`);
+                if (!stageEl) return;
+                stageEl.classList.remove('active', 'complete');
+                if (status === 'ERROR') return;
+                if (status === 'DONE') {
+                    stageEl.classList.add('complete');
+                    return;
+                }
+                const statusIndex = stages.indexOf(normalizedStatus);
+                const stageIndex = stages.indexOf(stageKey);
+                if (statusIndex > stageIndex) {
+                    stageEl.classList.add('complete');
+                } else if (statusIndex === stageIndex) {
+                    stageEl.classList.add('active');
+                    if (stageKey === 'THINKING') {
+                        const sent = job.chunks_sent || 0;
+                        const completed = job.chunks_completed || 0;
+                        const percent = job.thinking_progress ?? (sent ? Math.round((completed / sent) * 100) : 0);
+                        stageEl.textContent = `3. AI Thinking (${completed}/${sent || job.chunks_total || 0}, ${percent}%)`;
+                    }
+                }
+            });
+        }
+
+        function renderChunks(chunksData) {
+            chunksList.innerHTML = '';
+            const entries = Object.values(chunksData || {}).sort((a, b) => {
+                const aStart = a.page_start || (a.page_numbers ? a.page_numbers[0] : 0);
+                const bStart = b.page_start || (b.page_numbers ? b.page_numbers[0] : 0);
+                return aStart - bStart;
+            });
+            entries.forEach(chunk => {
+                const card = document.createElement('div');
+                card.className = 'wr-chunk-card';
+                const pages = chunk.page_numbers ? chunk.page_numbers.join(', ') : `${chunk.page_start || ''}-${chunk.page_end || ''}`;
+                const statusLabel = escapeHtml(chunk.status || 'pending');
+                const aiProgress = escapeHtml(chunk.ai_progress || '');
+                const streamingHtml = chunk.streaming_output ? `<div class="wr-streaming">${escapeHtml(chunk.streaming_output)}</div>` : '';
+                const errorHtml = chunk.error ? `<div class="wr-error" style="margin-top:12px;">${escapeHtml(chunk.error)}</div>` : '';
+                card.innerHTML = `
+                    <div class="wr-chunk-header">
+                        <div>
+                            <div class="wr-chunk-title">Chunk ${chunk.chunk_id}</div>
+                            <div class="wr-chunk-status">Pages ${pages} · ${chunk.word_count || 0} words</div>
+                        </div>
+                        <div class="wr-chunk-status">${statusLabel}</div>
+                    </div>
+                    <div class="wr-chunk-body">
+                        ${aiProgress}
+                        ${streamingHtml}
+                        ${errorHtml}
+                    </div>
+                `;
+                const actions = document.createElement('div');
+                actions.className = 'wr-actions';
+                const retryBtn = document.createElement('button');
+                retryBtn.className = 'wr-secondary-btn';
+                retryBtn.textContent = 'Retry';
+                retryBtn.disabled = chunk.status !== 'failed';
+                retryBtn.addEventListener('click', () => retryChunk(chunk.chunk_id));
+                const recheckBtn = document.createElement('button');
+                recheckBtn.className = 'wr-secondary-btn';
+                recheckBtn.textContent = 'Re-check';
+                recheckBtn.disabled = chunk.status !== 'completed';
+                recheckBtn.addEventListener('click', () => recheckChunk(chunk.chunk_id));
+                actions.appendChild(retryBtn);
+                actions.appendChild(recheckBtn);
+                card.appendChild(actions);
+                chunksList.appendChild(card);
+            });
+        }
+
+        async function retryChunk(chunkId) {
+            if (!currentJobId) return;
+            await fetch(`/api/wr/jobs/${currentJobId}/chunks/${chunkId}/retry`, { method: 'POST' });
+        }
+
+        async function recheckChunk(chunkId) {
+            if (!currentJobId) return;
+            await fetch(`/api/wr/jobs/${currentJobId}/chunks/${chunkId}/recheck`, { method: 'POST' });
+        }
+
+        async function fetchResults() {
+            if (!currentJobId) return;
+            const response = await fetch(`/api/wr/jobs/${currentJobId}/result`);
+            const data = await response.json();
+            currentResults = data.rows || [];
+            renderResults(currentResults, data.no_edits);
+        }
+
+        function renderResults(rows, noEdits, emptyMessage = null) {
+            resultsCard.style.display = 'block';
+            if (!rows || rows.length === 0) {
+                if (emptyMessage) {
+                    resultsEmpty.textContent = emptyMessage;
+                } else {
+                    resultsEmpty.textContent = 'All reviewed content already meets Bain standards. No edits recommended.';
+                }
+                resultsEmpty.style.display = 'block';
+                resultsTable.style.display = 'none';
+                return;
+            }
+            resultsEmpty.style.display = noEdits ? 'block' : 'none';
+            if (noEdits) {
+                resultsEmpty.textContent = 'All reviewed content already meets Bain standards. No edits recommended.';
+            }
+            resultsTable.style.display = 'table';
+            const tbody = resultsTable.querySelector('tbody');
+            tbody.innerHTML = '';
+            rows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escapeHtml(row.page)}</td>
+                    <td>${escapeHtml(row.original)}</td>
+                    <td>${escapeHtml(row.revised)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function applySearchFilter() {
+            const term = searchInput.value.trim().toLowerCase();
+            if (!term) {
+                renderResults(currentResults, currentResults.length === 0);
+                return;
+            }
+            const filtered = currentResults.filter(row => {
+                return String(row.page).includes(term) ||
+                    row.original.toLowerCase().includes(term) ||
+                    row.revised.toLowerCase().includes(term);
+            });
+            renderResults(filtered, false, filtered.length === 0 ? 'No rows match your search.' : null);
+        }
+
+        searchInput.addEventListener('input', () => applySearchFilter());
+
+        downloadCsv.addEventListener('click', () => {
+            if (!currentJobId) return;
+            window.open(`/api/wr/jobs/${currentJobId}/result?format=csv`, '_blank');
+        });
+        downloadXlsx.addEventListener('click', () => {
+            if (!currentJobId) return;
+            window.open(`/api/wr/jobs/${currentJobId}/result?format=xlsx`, '_blank');
+        });
+
+        async function pollJob() {
+            if (!currentJobId) return;
+            const response = await fetch(`/api/wr/jobs/${currentJobId}`);
+            const data = await response.json();
+            if (data.error) {
+                errorBanner.textContent = data.error;
+                errorBanner.style.display = 'block';
+                clearInterval(pollingTimer);
+                return;
+            }
+            const job = data.job || {};
+            const chunks = data.chunks || {};
+            statusCard.style.display = 'block';
+            setStage(job.status, job);
+            renderChunks(chunks);
+            const sent = job.chunks_sent || job.chunks_total || 0;
+            const completed = job.chunks_completed || 0;
+            const basePercent = sent ? Math.min(100, Math.round((completed / sent) * 100)) : 0;
+            const thinkingPercent = job.thinking_progress ?? 0;
+            const progressPercent = Math.max(basePercent, thinkingPercent);
+            progressFill.style.width = `${progressPercent}%`;
+
+            if (job.status === 'DONE') {
+                clearInterval(pollingTimer);
+                await fetchResults();
+            } else if (job.status === 'ERROR') {
+                clearInterval(pollingTimer);
+                errorBanner.textContent = job.error || 'Unexpected error occurred.';
+                errorBanner.style.display = 'block';
+            }
+        }
+
+        uploadForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!currentFile) {
+                alert('Please choose a PPTX file first.');
+                return;
+            }
+            resetUI();
+            const formData = new FormData();
+            formData.append('ppt_file', currentFile);
+
+            const uploadResponse = await fetch('/api/wr/jobs', {
+                method: 'POST',
+                body: formData
+            });
+            const uploadData = await uploadResponse.json();
+            if (!uploadResponse.ok) {
+                alert(uploadData.error || 'Failed to upload file.');
+                return;
+            }
+            currentJobId = uploadData.job_id;
+
+            const runResponse = await fetch(`/api/wr/jobs/${currentJobId}/run`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mode: currentMode,
+                    model: modelSelect.value
+                })
+            });
+            const runData = await runResponse.json();
+            if (!runResponse.ok) {
+                alert(runData.error || 'Failed to start revision.');
+                return;
+            }
+            statusCard.style.display = 'block';
+            pollJob();
+            pollingTimer = setInterval(pollJob, 2500);
+        });
+    </script>
+</body>
+</html>
