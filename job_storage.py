@@ -16,9 +16,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class PersistentJobStorage:
-    """Redis-based persistent storage for ZD jobs and results."""
+    """Redis-based persistent storage for modular job/result tracking."""
 
-    def __init__(self):
+    def __init__(self, prefix: str = "zd"):
+        """Create a storage helper scoped by a namespace prefix.
+
+        The prefix ensures that multiple tools (e.g., ZD, WR) can safely
+        coexist in the same Redis instance without key collisions.
+        """
+
         # Redis connection with fallback to in-memory for development
         try:
             redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
@@ -34,10 +40,11 @@ class PersistentJobStorage:
             self._memory_jobs = {}
             self._memory_results = {}
 
-        # Key prefixes
-        self.JOB_PREFIX = "zd_job:"
-        self.RESULT_PREFIX = "zd_result:"
-        self.JOB_LIST_KEY = "zd_jobs_list"
+        # Key prefixes (scoped by namespace)
+        namespace = prefix.strip() or "zd"
+        self.JOB_PREFIX = f"{namespace}_job:"
+        self.RESULT_PREFIX = f"{namespace}_result:"
+        self.JOB_LIST_KEY = f"{namespace}_jobs_list"
 
         # TTL for jobs (24 hours)
         self.JOB_TTL = 86400
@@ -226,11 +233,11 @@ class PersistentJobStorage:
 
 
 class ZDThreadPoolManager:
-    """Manages ThreadPool for ZD chunk processing."""
+    """Manages ThreadPool for chunk processing."""
 
-    def __init__(self, max_workers: int = 5):
+    def __init__(self, max_workers: int = 5, thread_name_prefix: str = "zd_worker"):
         self.max_workers = max_workers
-        self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="zd_worker")
+        self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix=thread_name_prefix)
         self.active_futures = {}
 
     def submit_chunk(self, job_id: str, chunk_id: str, func, *args, **kwargs):
@@ -258,6 +265,6 @@ class ZDThreadPoolManager:
         self.executor.shutdown(wait=wait)
 
 
-# Global instances
-job_storage = PersistentJobStorage()
-thread_pool = ZDThreadPoolManager(max_workers=5)
+# Global instances for the ZD tool (default namespace)
+job_storage = PersistentJobStorage(prefix="zd")
+thread_pool = ZDThreadPoolManager(max_workers=5, thread_name_prefix="zd_worker")
