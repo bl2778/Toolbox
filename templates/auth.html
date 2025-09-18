@@ -7,30 +7,50 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <div class="card">
-            <h1 class="title">Analytics Toolbox</h1>
-            <p class="subtitle">Secure access to professional consulting tools</p>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="container header-container">
+                <a href="/dashboard" class="app-brand" aria-label="Bain Toolbox home">
+                    <span class="app-brand-mark" aria-hidden="true">🔧</span>
+                    <span class="app-brand-text">Bain Toolbox</span>
+                </a>
+                <nav class="app-nav" aria-label="Primary navigation">
+                    <a href="/dashboard" class="nav-link">Dashboard</a>
+                </nav>
+            </div>
+        </header>
 
-            <form method="POST" action="/auth">
-                <div class="form-group">
-                    <label for="password" class="form-label">Access Credentials</label>
-                    <input type="password"
-                           id="password"
-                           name="password"
-                           class="form-input"
-                           placeholder="Enter secure access key"
-                           required
-                           autocomplete="current-password">
-                </div>
+        <main class="app-main container">
+            <div class="card page-header">
+                <h1 class="title">Analytics Toolbox</h1>
+                <p class="subtitle">Secure access to professional consulting tools</p>
 
-                <button type="submit" class="btn">Access Dashboard</button>
-            </form>
+                <form method="POST" action="/auth">
+                    <div class="form-group">
+                        <label for="password" class="form-label">Access Credentials</label>
+                        <input type="password"
+                               id="password"
+                               name="password"
+                               class="form-input"
+                               placeholder="Enter secure access key"
+                               required
+                               autocomplete="current-password">
+                    </div>
 
-            {% if error %}
-                <div class="error">{{ error }}</div>
-            {% endif %}
-        </div>
+                    <button type="submit" class="btn">Access Dashboard</button>
+                </form>
+
+                {% if error %}
+                    <div class="error">{{ error }}</div>
+                {% endif %}
+            </div>
+        </main>
+
+        <footer class="app-footer">
+            <div class="container footer">
+                <p>© 2024 Bain Toolbox. All rights reserved.</p>
+            </div>
+        </footer>
     </div>
 
     <script>
