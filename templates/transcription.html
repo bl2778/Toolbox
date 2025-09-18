@@ -7,104 +7,38 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <style>
-        /* Markdown styling */
-        .markdown-content {
-            line-height: 1.6;
-            color: #333;
-        }
-        .markdown-content h1, .markdown-content h2, .markdown-content h3,
-        .markdown-content h4, .markdown-content h5, .markdown-content h6 {
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
-            font-weight: bold;
-        }
-        .markdown-content h1 { font-size: 1.8em; color: #2c3e50; }
-        .markdown-content h2 { font-size: 1.5em; color: #34495e; }
-        .markdown-content h3 { font-size: 1.3em; color: #34495e; }
-        .markdown-content p { margin-bottom: 1em; }
-        .markdown-content ul, .markdown-content ol {
-            margin-bottom: 1em;
-            padding-left: 2em;
-        }
-        .markdown-content li { margin-bottom: 0.5em; }
-        .markdown-content blockquote {
-            border-left: 4px solid #ddd;
-            margin: 1em 0;
-            padding-left: 1em;
-            color: #666;
-        }
-        .markdown-content code {
-            background-color: #f4f4f4;
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-        }
-        .markdown-content pre {
-            background-color: #f4f4f4;
-            padding: 1em;
-            border-radius: 5px;
-            overflow-x: auto;
-            margin: 1em 0;
-        }
-        .markdown-content strong { font-weight: bold; }
-        .markdown-content em { font-style: italic; }
-
-        /* Collapsible section styling */
-        .collapsible {
-            background-color: #f1f3f4;
-            color: #333;
-            cursor: pointer;
-            padding: 15px;
-            width: 100%;
-            border: none;
-            text-align: left;
-            outline: none;
-            font-size: 16px;
-            border-radius: 5px;
-            margin-bottom: 10px;
-            transition: background-color 0.3s;
-        }
-        .collapsible:hover {
-            background-color: #e8eaed;
-        }
-        .collapsible.active {
-            background-color: #d1ecf1;
-        }
-        .collapsible-content {
-            padding: 0;
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out;
-            background-color: white;
-            border-radius: 5px;
-        }
-        .collapsible-content.active {
-            padding: 15px;
-            max-height: none;
-            border: 1px solid #ddd;
-        }
-    </style>
 </head>
 <body>
-    <a href="/logout" class="logout-btn">Logout</a>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="container header-container">
+                <a href="/dashboard" class="app-brand" aria-label="Bain Toolbox home">
+                    <span class="app-brand-mark" aria-hidden="true">🔧</span>
+                    <span class="app-brand-text">Bain Toolbox</span>
+                </a>
+                <nav class="app-nav" aria-label="Primary navigation">
+                    <a href="/dashboard" class="nav-link">Dashboard</a>
+                    <a href="/zd-tool" class="nav-link">Zero-Defect</a>
+                    <a href="/wr" class="nav-link">Wording Revision</a>
+                    <a href="/logout" class="nav-link logout-btn">Logout</a>
+                </nav>
+            </div>
+        </header>
 
-    <div class="container">
+        <main class="app-main container">
         <!-- Header -->
-        <div class="card">
+        <header class="card page-header">
             <h1 class="title">Audio Transcription</h1>
             <p class="subtitle">Transform client interview recordings into professional transcripts with AI-powered precision</p>
 
-            <div style="text-align: center; margin-bottom: 20px;">
-                <a href="/dashboard" class="btn" style="display: inline-block; width: auto; background: var(--gray-600);">
-                    Back to Dashboard
-                </a>
+            <div class="header-actions">
+                <a href="/dashboard" class="btn btn-secondary btn-inline">Back to Dashboard</a>
             </div>
-        </div>
+        </header>
 
         <!-- Upload Section -->
-        <div class="card">
-            <h2 style="margin-bottom: 20px; color: #333;">Upload Audio File</h2>
+        <section class="card section-card">
+            <h2 class="section-title">Upload Audio File</h2>
 
             <!-- File Upload Area -->
             <div class="file-upload-area" id="uploadArea">
@@ -118,7 +52,7 @@
             </div>
 
             <!-- File Information -->
-            <div class="file-info" id="fileInfo" style="display: none;">
+                <div class="file-info" id="fileInfo" style="display: none;">
                 <strong>Selected File:</strong> <span id="fileName"></span><br>
                 <strong>Size:</strong> <span id="fileSize"></span><br>
                 <strong>Type:</strong> <span id="fileType"></span>
@@ -127,11 +61,11 @@
             <!-- Model Selection -->
             <div class="form-group">
                 <label for="modelSelect" class="form-label">AI Model:</label>
-                <select id="modelSelect" class="form-input" style="height: auto; padding: 12px;">
+                <select id="modelSelect" class="form-input">
                     <option value="gemini-2.5-pro">Gemini 2.5 Pro (Higher Quality)</option>
                     <option value="gemini-2.5-flash">Gemini 2.5 Flash (Faster Processing)</option>
                 </select>
-                <small style="color: #666; display: block; margin-top: 5px;">
+                <small class="form-hint">
                     Pro: Better accuracy for complex audio | Flash: Faster transcription speed
                 </small>
             </div>
@@ -146,82 +80,82 @@
             </div>
 
             <!-- Action Buttons -->
-            <div style="display: flex; gap: 10px;">
-                <button type="button" class="btn" id="transcribeBtn" disabled>
+            <div class="action-row">
+                <button type="button" class="btn btn-full" id="transcribeBtn" disabled>
                     Start Transcription
                 </button>
-                <button type="button" class="btn" id="clearBtn" style="background: #6c757d; width: auto;" onclick="clearFile()">
+                <button type="button" class="btn btn-secondary btn-inline" id="clearBtn" onclick="clearFile()">
                     Clear
                 </button>
             </div>
 
             <!-- Progress Bar -->
-            <div id="progressSection" style="display: none;">
+            <div id="progressSection" class="progress-section" style="display: none;">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressBar"></div>
                 </div>
-                <div id="progressText" style="text-align: center; margin-top: 10px;">Processing...</div>
-                <div id="progressPercent" style="text-align: center; margin-top: 5px; font-weight: bold;">0%</div>
+                <div id="progressText" class="progress-copy">Processing...</div>
+                <div id="progressPercent" class="progress-percent">0%</div>
             </div>
-        </div>
+        </section>
 
         <!-- Results Section -->
-        <div class="card" id="resultsSection" style="display: none;">
-            <h2 style="margin-bottom: 20px; color: #333;">Transcription Results</h2>
+        <section class="card section-card" id="resultsSection" style="display: none;">
+            <h2 class="section-title">Transcription Results</h2>
 
-            <div style="margin-bottom: 15px;">
+            <div class="info-line">
                 <strong>Prompt Used:</strong> <span id="promptUsed"></span>
             </div>
 
             <div class="transcription-result" id="transcriptionText"></div>
 
             <!-- Edit mode -->
-            <div id="editMode" style="display: none; margin-top: 15px;">
-                <textarea id="editTextarea" class="form-input" rows="15" style="width: 100%; resize: vertical;"></textarea>
+            <div id="editMode" class="edit-mode" style="display: none;">
+                <textarea id="editTextarea" class="form-input" rows="15"></textarea>
             </div>
 
-            <div style="margin-top: 20px; text-align: center; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <div class="action-row action-row-center">
                 <button type="button" class="btn" id="copyBtn" onclick="copyToClipboard()">
                     Copy to Clipboard
                 </button>
-                <button type="button" class="btn" id="editBtn" onclick="toggleEdit()" style="background: #3498db;">
+                <button type="button" class="btn btn-secondary" id="editBtn" onclick="toggleEdit()">
                     Edit
                 </button>
-                <button type="button" class="btn" id="saveBtn" onclick="saveEdit()" style="background: #27ae60; display: none;">
+                <button type="button" class="btn" id="saveBtn" onclick="saveEdit()" style="display: none;">
                     Save
                 </button>
-                <button type="button" class="btn" id="cancelBtn" onclick="cancelEdit()" style="background: #e74c3c; display: none;">
+                <button type="button" class="btn btn-secondary" id="cancelBtn" onclick="cancelEdit()" style="display: none;">
                     Cancel
                 </button>
-                <button type="button" class="btn" id="summaryBtn" onclick="startSummary()" style="background: #9b59b6;">
+                <button type="button" class="btn" id="summaryBtn" onclick="startSummary()">
                     Auto Summary
                 </button>
             </div>
-        </div>
+        </section>
 
         <!-- Summary Section (Full Two Column Layout) -->
-        <div id="summarySection" style="display: none;">
+        <section id="summarySection" class="summary-section" style="display: none;">
             <!-- Back to Single Column Button at top -->
-            <div style="text-align: center; margin-bottom: 20px;">
-                <button type="button" class="btn" onclick="closeSummary()" style="background: #6c757d;">
+            <div class="header-actions">
+                <button type="button" class="btn btn-secondary btn-inline" onclick="closeSummary()">
                     ← Back to Single Column View
                 </button>
             </div>
 
-            <div style="display: flex; gap: 20px; min-height: 80vh;">
+            <div class="split-panel">
                 <!-- Left Column: All Original Content -->
-                <div style="flex: 1;">
+                <div class="panel">
                     <!-- Header -->
-                    <div class="card">
+                    <div class="card page-header">
                         <h1 class="title">🎤 Audio Transcription</h1>
                         <p class="subtitle">Upload your client interview recordings for AI-powered transcription</p>
                     </div>
 
                     <!-- Upload Section (in summary mode) -->
-                    <div class="card" id="uploadSectionSummary" style="display: none;">
-                        <h2 style="margin-bottom: 20px; color: #333;">Upload Audio File</h2>
+                    <div class="card section-card" id="uploadSectionSummary" style="display: none;">
+                        <h2 class="section-title">Upload Audio File</h2>
                         <div class="file-upload-area" id="uploadAreaSummary">
-                                        <div class="upload-text">
+                            <div class="upload-text">
                                 <strong>Drag & drop your audio file here</strong><br>
                                 or <strong>click to select</strong>
                                 <br><br>
@@ -231,83 +165,82 @@
                     </div>
 
                     <!-- Transcript Results in Summary Mode -->
-                    <div class="card">
-                        <h2 style="margin-bottom: 20px; color: #333;">Transcription Results</h2>
-                        <div style="margin-bottom: 15px;">
+                    <div class="card section-card">
+                        <h2 class="section-title">Transcription Results</h2>
+                        <div class="info-line">
                             <strong>Prompt Used:</strong> <span id="promptUsedSummary"></span>
                         </div>
-                        <div class="transcription-result" id="originalTranscriptText" style="max-height: 500px; overflow-y: auto;"></div>
+                        <div class="transcription-result" id="originalTranscriptText"></div>
                     </div>
                 </div>
 
                 <!-- Right Column: Summary Panel -->
-                <div style="flex: 1;">
-                    <div class="card" style="height: fit-content;">
-                        <h2 style="margin-bottom: 1.5rem; color: var(--navy-800); font-weight: 600;">AI Summary</h2>
+                <div class="panel">
+                    <div class="card summary-panel">
+                        <h2 class="section-title">AI Summary</h2>
 
                         <!-- Model Selection -->
-                        <div class="form-group" style="margin-bottom: 15px;">
+                        <div class="form-group">
                             <label for="summaryModelSelect" class="form-label">AI Model:</label>
-                            <select id="summaryModelSelect" class="form-input" style="height: auto; padding: 12px;">
+                            <select id="summaryModelSelect" class="form-input">
                                 <option value="gpt-5" selected>GPT-5 (Latest)</option>
                                 <option value="gpt-5-thinking">GPT-5 Thinking (Shows reasoning process)</option>
                             </select>
-                            <small style="color: #666; display: block; margin-top: 5px;">
+                            <small class="form-hint">
                                 GPT-5 Thinking: Shows the AI's thought process with streaming output
                             </small>
                         </div>
 
                         <!-- Prompt Editor -->
-                        <div class="form-group" style="margin-bottom: 15px;">
+                        <div class="form-group">
                             <label for="summaryPrompt" class="form-label">Summary Prompt:</label>
                             <textarea id="summaryPrompt"
                                       class="form-input"
                                       rows="6"
-                                      style="resize: vertical;"
                                       placeholder="Loading default prompt...">You are a professional consultant, now helping a client with their project. You just had an interview, can you please summarize the key takeaways using professional consulting language. Please output in email-ready format with two sections: a) Executive Summary b) Details. The summary should exactly follow what was discussed in the transcript, please don't imagine.</textarea>
-                            <small style="color: #666; display: block; margin-top: 5px;">
+                            <small class="form-hint">
                                 Note: The transcript will be automatically appended after your prompt.
                             </small>
                         </div>
 
                         <!-- Generate Button -->
-                        <button type="button" class="btn" id="generateSummaryBtn" onclick="generateSummary()" style="background: #9b59b6; margin-bottom: 20px; width: 100%;">
+                        <button type="button" class="btn btn-full" id="generateSummaryBtn" onclick="generateSummary()">
                             Generate Summary
                         </button>
 
                         <!-- Summary Progress -->
-                        <div id="summaryProgress" style="display: none; margin-bottom: 20px;">
-                            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid #9b59b6;">
+                        <div id="summaryProgress" class="summary-progress" style="display: none;">
+                            <div class="callout">
                                 <div id="summaryProgressText">准备生成摘要...</div>
                             </div>
                         </div>
 
                         <!-- Thinking Process Section -->
-                        <div id="thinkingSection" style="display: none; margin-bottom: 20px;">
+                        <div id="thinkingSection" class="summary-stack" style="display: none;">
                             <button class="collapsible active" onclick="toggleThinking()">
                                 <span>Thought Process</span>
-                                <span id="thinkingToggleIcon" style="float: right;">▼</span>
+                                <span id="thinkingToggleIcon" class="toggle-icon">▼</span>
                             </button>
                             <div class="collapsible-content active" id="thinkingContent">
-                                <div class="markdown-content" id="thinkingText" style="max-height: 400px; overflow-y: auto;"></div>
+                                <div class="markdown-content markdown-panel" id="thinkingText"></div>
                             </div>
                         </div>
 
                         <!-- Final Summary Section -->
-                        <div id="summaryResult" style="display: none;">
+                        <div id="summaryResult" class="summary-stack" style="display: none;">
                             <button class="collapsible active" onclick="toggleAnswer()">
                                 <span>Final Summary</span>
-                                <span id="answerToggleIcon" style="float: right;">▼</span>
+                                <span id="answerToggleIcon" class="toggle-icon">▼</span>
                             </button>
                             <div class="collapsible-content active" id="answerContent">
-                                <div class="markdown-content" id="answerText" style="max-height: 500px; overflow-y: auto;"></div>
+                                <div class="markdown-content markdown-panel" id="answerText"></div>
                             </div>
 
-                            <div style="margin-top: 15px; text-align: center; display: flex; gap: 10px;">
-                                <button type="button" class="btn" id="copyThinkingBtn" onclick="copyThinkingToClipboard()" style="background: #3498db; flex: 1; display: none;">
+                            <div class="action-row">
+                                <button type="button" class="btn btn-secondary btn-flex" id="copyThinkingBtn" onclick="copyThinkingToClipboard()" style="display: none;">
                                     Copy Thinking
                                 </button>
-                                <button type="button" class="btn" onclick="copySummaryToClipboard()" style="background: #27ae60; width: 100%;">
+                                <button type="button" class="btn" onclick="copySummaryToClipboard()">
                                     Copy Summary
                                 </button>
                             </div>
@@ -315,7 +248,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- Loading Section -->
         <div class="card loading" id="loadingSection" style="display: none;">
@@ -323,6 +256,13 @@
             <p>Transcribing your audio file...</p>
             <p><small>This may take a few minutes depending on file size.</small></p>
         </div>
+        </main>
+
+        <footer class="app-footer">
+            <div class="container footer">
+                <p>© 2024 Bain Toolbox. All rights reserved.</p>
+            </div>
+        </footer>
     </div>
 
     <script>
