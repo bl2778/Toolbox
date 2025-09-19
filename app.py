@@ -666,19 +666,30 @@ Tasks for each slide:
    • Within the slide: contradictions between the tagline and the body_other content, or internal logical gaps.
    • Across slides: contradictions or mis-alignments between this slide's tagline and earlier/later taglines. (Reference both page numbers when you spot one.)
 
+CRITICAL: You must categorize issues correctly into their respective columns:
+- ONLY spelling mistakes go in column 2
+- ONLY grammar/wording issues go in column 3
+- ONLY logic inconsistencies go in column 4
+- DO NOT mix different types of issues in the same column
+
 Output format:
-Produce a three-column table where each row corresponds to one slide.
+Return a GitHub-Flavored Markdown table with EXACTLY these column headers:
+| page_number | Spelling mistakes | Grammar / wording issues | Logic inconsistencies |
 
-• Column 1 – Comma-separated list of spelling mistakes for that slide, or "—" if none.
-• Column 2 – Comma-separated list of grammar / wording issues, or "—".
-• Column 3 –
-  "—" if the slide is logically sound.
-  Otherwise, a short description of the inconsistency.
-  For cross-slide issues, prefix with "↔ p X" where X is the other slide's page_number (e.g., "↔ p 5: tagline contradicts revenue trend").
-• Do NOT correct or rewrite the original content; only list the issues.
+For each row:
+• Column 1: The page number
+• Column 2: ONLY spelling mistakes (comma-separated), or "—" if none
+• Column 3: ONLY grammar/wording issues (comma-separated), or "—" if none
+• Column 4: ONLY logic inconsistencies, or "—" if none
+  - For cross-slide issues, prefix with "↔ p X" where X is the other page number
 
-**Return a GitHub-Flavored Markdown table with columns: page_number | Spelling mistakes | Grammar / wording issues | Logic inconsistencies.
-No explanations, no code fences.**"""
+Example format:
+| page_number | Spelling mistakes | Grammar / wording issues | Logic inconsistencies |
+|-------------|-------------------|--------------------------|----------------------|
+| 1           | teh, recieve      | subject-verb disagreement| —                    |
+| 2           | —                 | missing article "the"    | contradicts p1 claim |
+
+DO NOT add explanations, code fences, or additional text. Return ONLY the markdown table."""
 
         # Prepare user message with slides data
         user_message = "Please analyze the following slides:\n\n"
@@ -1106,16 +1117,32 @@ def parse_markdown_table(text):
                         page_number = int(page_str)
                     elif page_str.replace('.', '').isdigit():
                         page_number = int(page_str.replace('.', ''))
+                    elif 'page' in page_str.lower():
+                        # Extract number from "Page 1", "page 1", etc.
+                        import re
+                        match = re.search(r'\d+', page_str)
+                        if match:
+                            page_number = int(match.group())
 
                     if page_number:
+                        # Clean and normalize issue text
+                        def clean_issue_text(text):
+                            if not text or text.strip() in ["—", "-", "None", "N/A", ""]:
+                                return ""
+                            return text.strip()
+
+                        spelling = clean_issue_text(parts[1])
+                        grammar = clean_issue_text(parts[2])
+                        logic = clean_issue_text(parts[3]) if len(parts) > 3 else ""
+
                         row = {
                             "page_number": page_number,
-                            "spelling": parts[1] if parts[1] != "—" and parts[1] != "-" else "",
-                            "grammar": parts[2] if parts[2] != "—" and parts[2] != "-" else "",
-                            "logic": parts[3] if len(parts) > 3 and parts[3] != "—" and parts[3] != "-" else ""
+                            "spelling": spelling,
+                            "grammar": grammar,
+                            "logic": logic
                         }
                         rows.append(row)
-                        print(f"[DEBUG] Added row for page {page_number}: {row}")
+                        print(f"[DEBUG] Added row for page {page_number}: spelling='{spelling}', grammar='{grammar}', logic='{logic}'")
                     else:
                         print(f"[DEBUG] Could not parse page number from '{page_str}'")
 

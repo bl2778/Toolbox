@@ -886,17 +886,33 @@ textarea.form-input {
 }
 
 .zd-results-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.95rem;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  table-layout: fixed;
 }
 
 .zd-results-table th,
 .zd-results-table td {
-    padding: 0.75rem;
-    border-bottom: 1px solid var(--color-border);
-    text-align: left;
-    vertical-align: top;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* 让每条 issue 一行显示，保留换行 */
+.zd-issue-item {
+  display: block;
+  white-space: pre-wrap;
+  margin-bottom: 0.35rem;
+}
+
+/* 关键：不要把 td 当 flex 容器 */
+.zd-issues-cell {
+  display: table-cell; /* 或者删掉 display 声明也可以 */
 }
 
 .zd-results-table thead {
@@ -910,12 +926,6 @@ textarea.form-input {
 .zd-page-number {
     font-weight: 600;
     color: var(--color-text-primary);
-}
-
-.zd-issues-cell {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
 }
 
 .zd-no-issues {

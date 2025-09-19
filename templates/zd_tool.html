@@ -147,12 +147,18 @@
 
             <div id="resultsTableContainer">
                 <table class="zd-results-table" id="resultsTable">
+                    <colgroup>
+                        <col style="width: 50px;">   <!-- 第1列：Page No. 变窄 -->
+                        <col style="width: 30%;">    <!-- 第2列：Spelling 宽一点 -->
+                        <col style="width: 40%;">    <!-- 第3列：Grammar -->
+                        <col style="width: 30%;">    <!-- 第4列：Logic -->
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th>Page</th>
-                            <th>Spelling Mistakes</th>
-                            <th>Grammar/Wording Issues</th>
-                            <th>Logic Inconsistencies</th>
+                            <th class="zd-page-header">P.</th>
+                            <th class="zd-spelling-header">Spelling</th>
+                            <th class="zd-grammar-header">Grammar</th>
+                            <th class="zd-logic-header">Logic</th>
                         </tr>
                     </thead>
                     <tbody id="resultsTableBody">
@@ -897,11 +903,18 @@
             // Update stats
             const statsDiv = document.getElementById('resultsStats');
             if (data.stats) {
-                const issuesCount = data.results ? data.results.filter(r => r.spelling || r.grammar || r.logic).length : 0;
+                const results = data.results || [];
+                const issuesCount = results.filter(r => r.spelling || r.grammar || r.logic).length;
+                const spellingCount = results.filter(r => r.spelling && r.spelling.trim()).length;
+                const grammarCount = results.filter(r => r.grammar && r.grammar.trim()).length;
+                const logicCount = results.filter(r => r.logic && r.logic.trim()).length;
+
                 statsDiv.innerHTML = `
                     <strong>Analysis Complete!</strong>
                     Processed ${data.stats.total_slides} slides (${data.stats.total_words} words).
                     Found issues on ${issuesCount} pages.
+                    <br>
+                    <small>Spelling: ${spellingCount} pages • Grammar: ${grammarCount} pages • Logic: ${logicCount} pages</small>
                 `;
             } else {
                 statsDiv.innerHTML = `
@@ -942,7 +955,31 @@
 
             console.log('[DEBUG] Populating table with', results.length, 'results');
 
+            const createIssueCell = (value, cellType = '') => {
+                const cell = document.createElement('td');
+                cell.className = `zd-issues-cell zd-${cellType}-cell`;
+
+                if (value && value.trim() !== '') {
+                    // Don't split on commas - just display the complete issue text
+                    // The AI should already format issues properly for each column
+                    const issueSpan = document.createElement('span');
+                    issueSpan.className = `zd-issue-item zd-${cellType}-item`;
+                    issueSpan.textContent = value;
+                    cell.appendChild(issueSpan);
+                } else {
+                    const noIssuesSpan = document.createElement('span');
+                    noIssuesSpan.className = 'zd-no-issues';
+                    noIssuesSpan.textContent = '\u2014';
+                    cell.appendChild(noIssuesSpan);
+                }
+
+                return cell;
+            };
+
+
             results.forEach((row, index) => {
+                console.log(`[DEBUG] Row ${index + 1} - Page ${row.page_number}: spelling="${row.spelling}", grammar="${row.grammar}", logic="${row.logic}"`);
+
                 const tr = document.createElement('tr');
 
                 const hasIssues = row.spelling || row.grammar || row.logic;
@@ -950,12 +987,20 @@
                     tr.style.opacity = '0.6';
                 }
 
-                tr.innerHTML = `
-                    <td class="zd-page-number">${row.page_number || 'N/A'}</td>
-                    <td class="zd-issues-cell">${row.spelling || '<span class="zd-no-issues">—</span>'}</td>
-                    <td class="zd-issues-cell">${row.grammar || '<span class="zd-no-issues">—</span>'}</td>
-                    <td class="zd-issues-cell ${row.logic ? 'zd-logic-issue' : ''}">${row.logic || '<span class="zd-no-issues">—</span>'}</td>
-                `;
+                // Add debug info as data attributes for easier inspection
+                tr.setAttribute('data-page', row.page_number);
+                tr.setAttribute('data-has-spelling', !!(row.spelling && row.spelling.trim()));
+                tr.setAttribute('data-has-grammar', !!(row.grammar && row.grammar.trim()));
+                tr.setAttribute('data-has-logic', !!(row.logic && row.logic.trim()));
+
+                const pageCell = document.createElement('td');
+                pageCell.className = 'zd-page-number';
+                pageCell.textContent = row.page_number || 'N/A';
+                tr.appendChild(pageCell);
+
+                tr.appendChild(createIssueCell(row.spelling || '', 'spelling'));
+                tr.appendChild(createIssueCell(row.grammar || '', 'grammar'));
+                tr.appendChild(createIssueCell(row.logic || '', 'logic'));
 
                 tbody.appendChild(tr);
             });
