@@ -50,6 +50,17 @@ openai_client = OpenAI(
     max_retries=2   # Built-in retry mechanism
 )
 
+# Configure Deepseek API (if available)
+# Deepseek API is OpenAI-compatible, base_url should be https://api.deepseek.com/v1
+deepseek_client = None
+if os.getenv('DEEPSEEK_API_KEY'):
+    deepseek_client = OpenAI(
+        api_key=os.getenv('DEEPSEEK_API_KEY'),
+        base_url=os.getenv('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1'),
+        timeout=300.0,
+        max_retries=2
+    )
+
 # Store transcription status in memory (in production, use Redis or database)
 transcription_status = {}
 # Store summary status in memory
@@ -609,7 +620,7 @@ def get_chunk_data(job_id: str, chunk_id: str) -> dict:
 
 # ZD Tool API endpoints
 
-def process_zd_chunk_async(job_id, chunk, model_name, max_concurrency=5):
+def process_zd_chunk_async(job_id, chunk, model_name, language="english", max_concurrency=5):
     """Process a single chunk with AI analysis."""
     chunk_id = chunk["chunk_id"]
 
@@ -650,8 +661,49 @@ def process_zd_chunk_async(job_id, chunk, model_name, max_concurrency=5):
         })
         update_chunk_result(job_id, chunk_id, chunk_data)
 
-        # Prepare the prompt
-        system_prompt = """You are a professional consultant performing a Zero-Defect (ZD) and logic review of an English-language PowerPoint deck that has been exported for you as easy-to-read JSON.
+        # Prepare the prompt based on language
+        if language == "chinese":
+            system_prompt = """你是麦肯锡的咨询顾问，我需要你帮我检查错别字，我已经把PPT的输出转化为你方便读取的JSON。
+
+接下来你会读取到PPT的具体内容，包括：
+• page_number - 页码
+• tagline - 标题文本（最重点检查部分）
+• body_other - 正文、项目符号、标注、图表（次重点检查部分，可能会有一些英文元素的标号如"A." "I-1"等，这些纯标号不需要检查）
+• speaker_notes - 演讲者备注（不需要检查）
+
+需要你帮我按照每一页PPT重点检查谬误，具体包括：
+1. 错别字 - 打字错误、重复字符、错误的同音字等
+2. 语病 - 主谓不一致、时态、冠词、标点、表述不当等
+3. 逻辑前后矛盾：
+   • 页面内的矛盾：tagline和body_other内容之间的矛盾，或内部逻辑缺陷
+   • 跨页面的矛盾：本页的tagline与之前或之后页面tagline的矛盾或不一致（发现时请注明两个页码）
+
+重要：你必须正确地将问题分类到各自的列中：
+- 只有错别字放在第2列
+- 只有语病问题放在第3列
+- 只有逻辑矛盾放在第4列
+- 不要将不同类型的问题混在同一列
+
+输出格式：
+返回一个Markdown表格，表头必须是：
+| page_number | 错别字 | 语病 | 逻辑前后矛盾 |
+
+每行内容：
+• 第1列：页码
+• 第2列：只放错别字（用逗号分隔），如无则填"—"
+• 第3列：只放语病问题（用逗号分隔），如无则填"—"
+• 第4列：只放逻辑矛盾，如无则填"—"
+  - 对于跨页问题，前缀使用"↔ p X"，其中X是另一页的页码
+
+示例格式：
+| page_number | 错别字 | 语病 | 逻辑前后矛盾 |
+|-------------|--------|------|-------------|
+| 1           | 错字示例 | 语病示例 | —           |
+| 2           | —      | 缺少主语 | ↔ p 1 与第1页矛盾 |
+
+不要添加解释、代码块或其他额外文本。只返回Markdown表格。"""
+        else:
+            system_prompt = """You are a professional consultant performing a Zero-Defect (ZD) and logic review of an English-language PowerPoint deck that has been exported for you as easy-to-read JSON.
 
 For every slide you will receive:
 • page_number
@@ -700,16 +752,23 @@ DO NOT add explanations, code fences, or additional text. Return ONLY the markdo
         zd_results[job_id][chunk_id]["status"] = "processing"
         zd_results[job_id][chunk_id]["ai_progress"] = "AI is analyzing content..."
 
-        # Call OpenAI API with streaming and robust error handling
+        # Select the appropriate API client based on model
+        if model_name in ['deepseek-chat', 'deepseek-reasoner']:
+            if not deepseek_client:
+                raise ValueError("Deepseek API key not configured. Please set DEEPSEEK_API_KEY in .env file")
+            api_client = deepseek_client
+        else:
+            api_client = openai_client
+
+        # Call API with streaming and robust error handling
         result_text = ""
-        print(f"[DEBUG] Starting streaming for chunk {chunk_id}")
 
         max_retries = 3
         retry_count = 0
 
         while retry_count < max_retries:
             try:
-                response = openai_client.chat.completions.create(
+                response = api_client.chat.completions.create(
                     model=model_name,
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -723,17 +782,40 @@ DO NOT add explanations, code fences, or additional text. Return ONLY the markdo
 
                 # Collect streaming response with real-time updates and error handling
                 last_update_time = time.time()
+                reasoning_text = ""  # For deepseek-reasoner model
 
                 for chunk_response in response:
                     try:
-                        if chunk_response.choices[0].delta.content is not None:
+                        # Handle deepseek-reasoner's reasoning_content (thinking process)
+                        if hasattr(chunk_response.choices[0].delta, 'reasoning_content') and \
+                           chunk_response.choices[0].delta.reasoning_content is not None:
+                            reasoning_content = chunk_response.choices[0].delta.reasoning_content
+                            reasoning_text += reasoning_content
+                            last_update_time = time.time()
+
+                            # Show reasoning process in streaming output for debugging
+                            if model_name == 'deepseek-reasoner':
+                                chunk_data.update({
+                                    "streaming_output": f"[Thinking...]\n{reasoning_text}\n\n[Answer:]\n{result_text}",
+                                    "ai_progress": f"AI reasoning... ({len(reasoning_text)} chars thinking)",
+                                    "last_update": last_update_time
+                                })
+                                update_chunk_result(job_id, chunk_id, chunk_data)
+
+                        # Handle regular content (final answer)
+                        elif chunk_response.choices[0].delta.content is not None:
                             content = chunk_response.choices[0].delta.content
                             result_text += content
                             last_update_time = time.time()
 
                             # Update streaming output in real-time using helper function
+                            display_text = result_text
+                            if reasoning_text and model_name == 'deepseek-reasoner':
+                                # For reasoner, show both thinking and answer
+                                display_text = f"[Thinking...]\n{reasoning_text}\n\n[Answer:]\n{result_text}"
+
                             chunk_data.update({
-                                "streaming_output": result_text,
+                                "streaming_output": display_text,
                                 "ai_progress": f"AI generating response... ({len(result_text)} chars)",
                                 "last_update": last_update_time
                             })
@@ -753,12 +835,11 @@ DO NOT add explanations, code fences, or additional text. Return ONLY the markdo
                         continue
 
                 # If we reach here, streaming completed successfully
-                print(f"[DEBUG] Streaming completed successfully for chunk {chunk_id} (attempt {retry_count + 1})")
                 break
 
             except Exception as api_error:
                 retry_count += 1
-                print(f"[WARNING] API error for chunk {chunk_id} (attempt {retry_count}/{max_retries}): {api_error}")
+                print(f"[WARNING] API error for chunk {chunk_id} (attempt {retry_count}/{max_retries}): {str(api_error)}")
 
                 if retry_count >= max_retries:
                     print(f"[ERROR] Max retries exceeded for chunk {chunk_id}")
@@ -767,25 +848,21 @@ DO NOT add explanations, code fences, or additional text. Return ONLY the markdo
                 # Update progress to show retry
                 chunk_data.update({
                     "ai_progress": f"Retrying... (attempt {retry_count + 1}/{max_retries})",
+                    "streaming_output": f"Error: {str(api_error)}\n\nRetrying...",
                     "last_update": time.time()
                 })
                 update_chunk_result(job_id, chunk_id, chunk_data)
 
                 # Wait before retry (exponential backoff)
                 wait_time = min(2 ** retry_count, 30)  # Cap at 30 seconds
-                print(f"[DEBUG] Waiting {wait_time} seconds before retry...")
                 time.sleep(wait_time)
 
         # Final result
         result_text = result_text.strip()
-        print(f"[DEBUG] Chunk {chunk_id} completed. Result length: {len(result_text)}")
-        print(f"[DEBUG] First 500 chars: {result_text[:500]}...")
 
         zd_results[job_id][chunk_id]["result_text"] = result_text
         zd_results[job_id][chunk_id]["final_result_text"] = result_text  # Keep a separate copy
         zd_results[job_id][chunk_id]["ai_progress"] = "Analysis completed"
-
-        print(f"[DEBUG] Chunk {chunk_id} stored in zd_results. Keys: {list(zd_results[job_id][chunk_id].keys())}")
 
         # Update chunk result status
         chunk_data.update({
@@ -814,20 +891,15 @@ DO NOT add explanations, code fences, or additional text. Return ONLY the markdo
                 for chunk_id_check, chunk_data_check in zd_results[job_id].items():
                     if chunk_data_check.get("status") != "completed":
                         all_chunks_completed = False
-                        print(f"[DEBUG] Chunk {chunk_id_check} not completed yet (status: {chunk_data_check.get('status')})")
                         break
 
             if all_chunks_completed:
-                print(f"[DEBUG] All {chunks_total} chunks completed, starting merge for job {job_id}")
                 update_job_status(job_id, {"status": ZD_STATUS_MERGING})
                 # Trigger result merging
                 merge_zd_results(job_id)
-            else:
-                print(f"[DEBUG] Count shows {new_completed}/{chunks_total} but not all chunks have completed status")
         elif job_data.get("status") == ZD_STATUS_DONE:
             # Job was already done but a chunk was re-checked and completed
             # Re-merge to incorporate the new results
-            print(f"[DEBUG] Re-merging results for job {job_id} after re-check completion")
             update_job_status(job_id, {"status": ZD_STATUS_MERGING})
             merge_zd_results(job_id)
 
@@ -900,11 +972,7 @@ def merge_zd_results(job_id):
     """Merge results from all chunks."""
     try:
         if job_id not in zd_results or job_id not in zd_jobs:
-            print(f"[DEBUG] Job {job_id} not found in results or jobs")
             return
-
-        print(f"[DEBUG] Starting merge for job {job_id}")
-        print(f"[DEBUG] Available chunks: {list(zd_results[job_id].keys())}")
 
         # Validate that all chunks are actually completed before merging
         chunks_total = zd_jobs[job_id].get("chunks_total", 0)
@@ -937,8 +1005,6 @@ def merge_zd_results(job_id):
         chunk_raw_results = {}  # Keep raw results for debugging
 
         for chunk_id, chunk_result in zd_results[job_id].items():
-            print(f"[DEBUG] Processing chunk {chunk_id}, status: {chunk_result.get('status', 'unknown')}")
-
             # Store raw result for preservation
             chunk_raw_results[chunk_id] = {
                 "status": chunk_result.get("status"),
@@ -953,7 +1019,6 @@ def merge_zd_results(job_id):
 
             if chunk_result["status"] == "failed":
                 failed_chunks.append(chunk_result)
-                print(f"[DEBUG] Chunk {chunk_id} failed: {chunk_result.get('error', 'No error message')}")
                 continue
 
             # Parse markdown table from result_text (try both sources)
@@ -963,27 +1028,16 @@ def merge_zd_results(job_id):
             # Use final_result_text if available, otherwise fall back to result_text
             text_to_parse = final_result_text if final_result_text else result_text
 
-            print(f"[DEBUG] Parsing chunk {chunk_id}:")
-            print(f"[DEBUG]   result_text length: {len(result_text)}")
-            print(f"[DEBUG]   final_result_text length: {len(final_result_text)}")
-            print(f"[DEBUG]   Using text length: {len(text_to_parse)}")
-
             if text_to_parse:
-                print(f"[DEBUG] First 200 chars: {text_to_parse[:200]}...")
                 rows = parse_markdown_table(text_to_parse)
-                print(f"[DEBUG] Parsed {len(rows)} rows from chunk {chunk_id}")
                 all_rows.extend(rows)
-            else:
-                print(f"[DEBUG] No text to parse for chunk {chunk_id}")
 
             # Also check raw_chunk_results if available for this job
             raw_chunks = zd_jobs[job_id].get("raw_chunk_results", {})
             if chunk_id in raw_chunks and not text_to_parse:
                 raw_text = raw_chunks[chunk_id].get("final_result_text", "")
                 if raw_text:
-                    print(f"[DEBUG] Found raw text for {chunk_id}, length: {len(raw_text)}")
                     rows = parse_markdown_table(raw_text)
-                    print(f"[DEBUG] Parsed {len(rows)} rows from raw data")
                     all_rows.extend(rows)
 
         # Remove duplicates and sort by page number
@@ -1000,9 +1054,6 @@ def merge_zd_results(job_id):
         # Sort by page number
         final_results = [unique_rows[page] for page in sorted(unique_rows.keys())]
 
-        print(f"[DEBUG] Merged {len(final_results)} final results")
-        print(f"[DEBUG] Failed chunks: {len(failed_chunks)}")
-
         # Update job status - PRESERVE raw chunk data
         completion_updates = {
             "status": ZD_STATUS_DONE,
@@ -1014,12 +1065,8 @@ def merge_zd_results(job_id):
         }
         update_job_status(job_id, completion_updates)
 
-        print(f"[DEBUG] Job {job_id} marked as DONE with {len(final_results)} results")
-
     except Exception as e:
-        print(f"[DEBUG] Error in merge_zd_results: {str(e)}")
-        import traceback
-        print(f"[DEBUG] Full traceback: {traceback.format_exc()}")
+        print(f"[ERROR] Error in merge_zd_results: {str(e)}")
 
         # Update both persistent and in-memory storage
         error_updates = {
@@ -1033,9 +1080,6 @@ def parse_markdown_table(text):
     """Parse markdown table into list of dictionaries."""
     rows = []
     lines = text.strip().split('\n')
-
-    print(f"[DEBUG] Parsing markdown table with {len(lines)} lines")
-    print(f"[DEBUG] First 10 lines: {lines[:10]}")
 
     # Clean up the text - remove <think> tags and other AI artifacts
     cleaned_lines = []
@@ -1061,28 +1105,24 @@ def parse_markdown_table(text):
         if line:  # Only add non-empty lines
             cleaned_lines.append(line)
 
-    print(f"[DEBUG] Cleaned to {len(cleaned_lines)} lines")
-
-    # Find table start - look for header with page_number or spelling
+    # Find table start - look for header with page_number or spelling (English/Chinese)
     header_found = False
     header_index = -1
 
     for i, line in enumerate(cleaned_lines):
-        if '|' in line and ('page_number' in line.lower() or 'spelling' in line.lower() or 'grammar' in line.lower()):
+        if '|' in line and ('page_number' in line.lower() or 'spelling' in line.lower() or 'grammar' in line.lower() or
+                           '错别字' in line or '语病' in line or '逻辑' in line):
             header_found = True
             header_index = i
-            print(f"[DEBUG] Found table header at line {i}: {line}")
             break
 
     if not header_found:
-        print(f"[DEBUG] No table header found. Cleaned lines: {cleaned_lines[:5]}")
         return rows
 
     # Find separator line (could be |---|---| or --- | --- | ---)
     separator_index = header_index + 1
     if separator_index < len(cleaned_lines):
         separator_line = cleaned_lines[separator_index]
-        print(f"[DEBUG] Separator line: {separator_line}")
 
         # Skip separator if it contains only dashes, pipes, and spaces
         if all(c in '-| ' for c in separator_line):
@@ -1093,12 +1133,10 @@ def parse_markdown_table(text):
 
     # Process data lines
     data_lines = cleaned_lines[data_start:]
-    print(f"[DEBUG] Processing {len(data_lines)} data lines starting from index {data_start}")
 
     for i, line in enumerate(data_lines):
         if '|' in line and line.strip() != '':
             parts = [part.strip() for part in line.split('|')]
-            print(f"[DEBUG] Line {i}: {len(parts)} parts - {parts}")
 
             # Handle different table formats - some may have empty first/last parts due to leading/trailing |
             if parts and parts[0] == '':
@@ -1142,17 +1180,10 @@ def parse_markdown_table(text):
                             "logic": logic
                         }
                         rows.append(row)
-                        print(f"[DEBUG] Added row for page {page_number}: spelling='{spelling}', grammar='{grammar}', logic='{logic}'")
-                    else:
-                        print(f"[DEBUG] Could not parse page number from '{page_str}'")
 
-                except (ValueError, IndexError) as e:
-                    print(f"[DEBUG] Error parsing line {i}: {e}")
+                except (ValueError, IndexError):
                     continue
-            else:
-                print(f"[DEBUG] Skipping line {i}: insufficient parts ({len(parts)})")
 
-    print(f"[DEBUG] Parsed {len(rows)} total rows")
     return rows
 
 def merge_row_results(row1, row2):
@@ -1237,13 +1268,18 @@ def run_zd_analysis(job_id):
         data = request.get_json() or {}
         mode = data.get('mode', 'fast')  # fast or precise
         model_name = data.get('model', 'gpt-4')
+        language = data.get('language', 'english')  # english or chinese
 
         # Validate mode
         if mode not in ['fast', 'precise']:
             mode = 'fast'
 
+        # Validate language
+        if language not in ['english', 'chinese']:
+            language = 'english'
+
         # Validate model
-        valid_models = ['gpt-5', 'gpt-5-thinking', 'gpt-4.5', 'gpt-5-pro', 'gpt-4']
+        valid_models = ['gpt-5', 'gpt-5-thinking', 'gpt-4.5', 'gpt-5-pro', 'gpt-4', 'deepseek-chat', 'deepseek-reasoner']
         if model_name not in valid_models:
             model_name = 'gpt-4'
 
@@ -1254,10 +1290,11 @@ def run_zd_analysis(job_id):
         job["status"] = ZD_STATUS_PARSING
         job["mode"] = mode
         job["model"] = model_name
+        job["language"] = language
         job["last_update"] = time.time()
 
-        # Extract and chunk PPT
-        result = extract_ppt_for_zd(temp_file_path, mode)
+        # Extract and chunk PPT with language parameter
+        result = extract_ppt_for_zd(temp_file_path, mode, language)
 
         if not result["success"]:
             job["status"] = ZD_STATUS_ERROR
@@ -1269,6 +1306,8 @@ def run_zd_analysis(job_id):
         job["stats"] = result["stats"]
         job["chunks"] = result["chunks"]
         job["chunks_total"] = result["total_chunks"]
+        job["model"] = model_name
+        job["language"] = language
         job["status"] = ZD_STATUS_CHUNKING
         job["last_update"] = time.time()
 
@@ -1288,7 +1327,7 @@ def run_zd_analysis(job_id):
                         job_id,
                         chunk["chunk_id"],
                         process_zd_chunk_async,
-                        job_id, chunk, model_name
+                        job_id, chunk, model_name, language
                     )
                     futures.append((future, chunk["chunk_id"]))
 
@@ -1349,7 +1388,6 @@ def get_zd_job_status(job_id):
 
         progress = (actual_completed / chunks_total) * 100
         job['progress'] = round(progress, 1)
-        print(f"[DEBUG] Progress calculation for {job_id}: {actual_completed}/{chunks_total} = {progress:.1f}%")
     else:
         job['progress'] = 0
 
@@ -1581,13 +1619,11 @@ def recover_zd_jobs():
                 # Decide recovery action - only merge if all chunks are actually completed
                 if chunks_completed >= chunks_total:
                     # All chunks completed - job should be merged
-                    print(f"[DEBUG] Recovery: All {chunks_completed} chunks completed for job {job_id}")
                     updates['status'] = ZD_STATUS_MERGING
                     job_storage.update_job(job_id, updates)
                     merge_zd_results(job_id)
                 elif chunks_completed + chunks_failed >= chunks_total and chunks_in_progress == 0:
                     # All chunks accounted for but some failed - still try to merge partial results
-                    print(f"[DEBUG] Recovery: {chunks_completed} completed, {chunks_failed} failed for job {job_id}")
                     updates['status'] = ZD_STATUS_MERGING
                     job_storage.update_job(job_id, updates)
                     merge_zd_results(job_id)
@@ -1666,6 +1702,7 @@ def retry_zd_chunk(job_id, chunk_id):
 
     try:
         model_name = job.get("model", "gpt-4")
+        language = job.get("language", "english")
 
         # Reset chunk status
         if job_id in zd_results and chunk_id in zd_results[job_id]:
@@ -1676,7 +1713,7 @@ def retry_zd_chunk(job_id, chunk_id):
         # Process chunk in background
         thread = threading.Thread(
             target=process_zd_chunk_async,
-            args=(job_id, chunk, model_name)
+            args=(job_id, chunk, model_name, language)
         )
         thread.daemon = True
         thread.start()
@@ -1714,6 +1751,7 @@ def recheck_zd_chunk(job_id, chunk_id):
 
     try:
         model_name = job.get("model", "gpt-4")
+        language = job.get("language", "english")
 
         # Reset chunk status and clear previous result but keep original chunk data
         if job_id in zd_results and chunk_id in zd_results[job_id]:
@@ -1732,12 +1770,10 @@ def recheck_zd_chunk(job_id, chunk_id):
         job["chunks_completed"] = max(0, job["chunks_completed"] - 1)
         job["last_update"] = time.time()
 
-        print(f"[DEBUG] Re-checking chunk {chunk_id} for job {job_id}")
-
         # Process chunk in background with same content
         thread = threading.Thread(
             target=process_zd_chunk_async,
-            args=(job_id, chunk, model_name)
+            args=(job_id, chunk, model_name, language)
         )
         thread.daemon = True
         thread.start()

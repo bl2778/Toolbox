@@ -137,8 +137,6 @@ class PPTExtractor:
                 print(f"[WARNING] Extraction timeout after 5 minutes, stopping at slide {idx + 1}")
                 break
 
-            print(f"[DEBUG] Processing slide {idx + 1}/{max_slides}")
-
             try:
                 # Extract from shapes with limits
                 max_shapes = min(200, len(slide.shapes))  # Limit to 200 shapes per slide
@@ -211,36 +209,51 @@ class PPTExtractor:
 
         return zd_slides
 
-    def get_word_count(self, text: str) -> int:
-        """Count words in English text."""
+    def get_word_count(self, text: str, language: str = "english") -> int:
+        """Count words in English text or characters in Chinese text."""
         if not text or not text.strip():
             return 0
-        return len(text.split())
 
-    def get_slide_stats(self, zd_slides: List[Dict[str, Any]]) -> Dict[str, Any]:
+        if language == "chinese":
+            # For Chinese, count characters (excluding spaces and punctuation)
+            import re
+            # Remove all whitespace and common punctuation
+            chinese_chars = re.sub(r'[\s\.\,\!\?\:\;\"\'\(\)\[\]\{\}]', '', text)
+            return len(chinese_chars)
+        else:
+            # For English, count words
+            return len(text.split())
+
+    def get_slide_stats(self, zd_slides: List[Dict[str, Any]], language: str = "english") -> Dict[str, Any]:
         """Get statistics about the slides."""
         total_slides = len(zd_slides)
         total_words = 0
 
         for slide in zd_slides:
-            slide_words = (self.get_word_count(slide["tagline"]) +
-                          self.get_word_count(slide["body_other"]))
+            slide_words = (self.get_word_count(slide["tagline"], language) +
+                          self.get_word_count(slide["body_other"], language))
             total_words += slide_words
 
         avg_words_per_slide = total_words / total_slides if total_slides > 0 else 0
+
+        # Determine the unit based on language
+        unit_name = "characters" if language == "chinese" else "words"
 
         return {
             "total_slides": total_slides,
             "total_words": total_words,
             "avg_words_per_slide": round(avg_words_per_slide, 1),
-            "recommended_mode": "fast" if avg_words_per_slide < 100 else "precise"
+            "recommended_mode": "fast" if avg_words_per_slide < 100 else "precise",
+            "unit": unit_name
         }
 
 
 class TextChunker:
     """Handles text chunking for ZD analysis."""
 
-    def __init__(self):
+    def __init__(self, language: str = "english"):
+        self.language = language
+
         # Chunking configuration
         self.fast_config = {
             "target_words_min": 4000,
@@ -257,10 +270,21 @@ class TextChunker:
         }
 
     def count_slide_words(self, slide: Dict[str, Any]) -> int:
-        """Count words in tagline and body_other only."""
-        tagline_words = len(slide["tagline"].split()) if slide["tagline"] else 0
-        body_words = len(slide["body_other"].split()) if slide["body_other"] else 0
-        return tagline_words + body_words
+        """Count words/characters in tagline and body_other only."""
+        if self.language == "chinese":
+            import re
+            # For Chinese, count characters (excluding spaces and punctuation)
+            tagline_text = slide.get("tagline", "")
+            body_text = slide.get("body_other", "")
+            combined_text = tagline_text + body_text
+            # Remove all whitespace and common punctuation
+            chinese_chars = re.sub(r'[\s\.\,\!\?\:\;\"\'\(\)\[\]\{\}]', '', combined_text)
+            return len(chinese_chars)
+        else:
+            # For English, count words
+            tagline_words = len(slide["tagline"].split()) if slide["tagline"] else 0
+            body_words = len(slide["body_other"].split()) if slide["body_other"] else 0
+            return tagline_words + body_words
 
     def create_chunks(self, zd_slides: List[Dict[str, Any]], mode: str = "fast") -> List[Dict[str, Any]]:
         """Create chunks based on the specified mode."""
@@ -323,16 +347,17 @@ class TextChunker:
         return chunks
 
 
-def extract_ppt_for_zd(file_path: str, mode: str = "fast") -> Dict[str, Any]:
+def extract_ppt_for_zd(file_path: str, mode: str = "fast", language: str = "english") -> Dict[str, Any]:
     """Main function to extract and chunk PPT for ZD analysis."""
     import time
 
     start_time = time.time()
-    print(f"[INFO] Starting ZD extraction for: {file_path} (mode: {mode})")
+    unit_name = "characters" if language == "chinese" else "words"
+    print(f"[INFO] Starting ZD extraction for: {file_path} (mode: {mode}, language: {language})")
 
     try:
         extractor = PPTExtractor()
-        chunker = TextChunker()
+        chunker = TextChunker(language=language)
 
         # Extract raw data with timeout
         print("[INFO] Step 1: Extracting PowerPoint text...")
@@ -346,7 +371,7 @@ def extract_ppt_for_zd(file_path: str, mode: str = "fast") -> Dict[str, Any]:
 
         print("[INFO] Step 3: Calculating statistics...")
         # Get statistics
-        stats = extractor.get_slide_stats(zd_slides)
+        stats = extractor.get_slide_stats(zd_slides, language=language)
 
         print(f"[INFO] Step 4: Creating chunks in {mode} mode...")
         # Create chunks with timeout check
@@ -357,7 +382,7 @@ def extract_ppt_for_zd(file_path: str, mode: str = "fast") -> Dict[str, Any]:
 
         elapsed = time.time() - start_time
         print(f"[INFO] ZD extraction completed successfully in {elapsed:.2f} seconds")
-        print(f"[INFO] Results: {len(zd_slides)} slides, {len(chunks)} chunks, {stats.get('total_words', 0)} words")
+        print(f"[INFO] Results: {len(zd_slides)} slides, {len(chunks)} chunks, {stats.get('total_words', 0)} {unit_name}")
 
         return {
             "success": True,

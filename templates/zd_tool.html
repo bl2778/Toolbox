@@ -70,6 +70,16 @@
                 </div>
 
                 <div class="zd-form-group">
+                    <label>Document Language</label>
+                    <div class="zd-model-selection">
+                        <select id="languageSelect" name="language">
+                            <option value="english">English</option>
+                            <option value="chinese">Chinese</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="zd-form-group">
                     <label>AI Model</label>
                     <div class="zd-model-selection">
                         <select id="modelSelect" name="model">
@@ -78,6 +88,8 @@
                             <option value="gpt-4.5">GPT-4.5</option>
                             <option value="gpt-5-pro">GPT-5 Pro</option>
                             <option value="gpt-4">GPT-4</option>
+                            <option value="deepseek-chat">Deepseek Chat</option>
+                            <option value="deepseek-reasoner">Deepseek Reasoner</option>
                         </select>
                     </div>
                 </div>
@@ -267,7 +279,8 @@
                     },
                     body: JSON.stringify({
                         mode: currentMode,
-                        model: document.getElementById('modelSelect').value
+                        model: document.getElementById('modelSelect').value,
+                        language: document.getElementById('languageSelect').value
                     })
                 });
 
@@ -291,8 +304,9 @@
             document.getElementById('progressContainer').style.display = 'block';
 
             if (data.stats) {
+                const unit = data.stats.unit || 'words';
                 document.getElementById('statusMessage').textContent =
-                    `Analyzing ${data.stats.total_slides} slides (${data.stats.total_words} words) in ${data.total_chunks} chunks`;
+                    `Analyzing ${data.stats.total_slides} slides (${data.stats.total_words} ${unit}) in ${data.total_chunks} chunks`;
             }
         }
 
@@ -908,10 +922,11 @@
                 const spellingCount = results.filter(r => r.spelling && r.spelling.trim()).length;
                 const grammarCount = results.filter(r => r.grammar && r.grammar.trim()).length;
                 const logicCount = results.filter(r => r.logic && r.logic.trim()).length;
+                const unit = data.stats.unit || 'words';
 
                 statsDiv.innerHTML = `
                     <strong>Analysis Complete!</strong>
-                    Processed ${data.stats.total_slides} slides (${data.stats.total_words} words).
+                    Processed ${data.stats.total_slides} slides (${data.stats.total_words} ${unit}).
                     Found issues on ${issuesCount} pages.
                     <br>
                     <small>Spelling: ${spellingCount} pages • Grammar: ${grammarCount} pages • Logic: ${logicCount} pages</small>
