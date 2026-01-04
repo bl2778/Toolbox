@@ -513,10 +513,10 @@ def generate_summary():
         if not custom_prompt.strip():
             custom_prompt = """You are a professional consultant, now helping a client with their project. You just had an interview, can you please summarize the key takeaways using professional consulting language. Please output in email-ready format with two sections: a) Executive Summary b) Details. The summary should exactly follow what was discussed in the transcript, please don't imagine."""
 
-        # Validate model selection for new GPT-5 models
-        valid_gpt_models = ['gpt-5', 'gpt-5-thinking', 'gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo']
+        # Validate model selection for new gpt-5-2 models
+        valid_gpt_models = ['gpt-5-2', 'gpt-5-2-thinking', 'gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo']
         if model_name not in valid_gpt_models:
-            model_name = 'gpt-5'  # Default to gpt-5
+            model_name = 'gpt-5-2'  # Default to gpt-5-2
 
         # Generate unique summary ID
         summary_id = str(uuid.uuid4())
@@ -1279,7 +1279,7 @@ def run_zd_analysis(job_id):
             language = 'english'
 
         # Validate model
-        valid_models = ['gpt-5', 'gpt-5-thinking', 'gpt-4.5', 'gpt-5-pro', 'gpt-4', 'deepseek-chat', 'deepseek-reasoner']
+        valid_models = ['gpt-5-2', 'gpt-5-2-thinking', 'gpt-4.5', 'gpt-5-2-pro', 'gpt-4', 'deepseek-chat', 'deepseek-reasoner']
         if model_name not in valid_models:
             model_name = 'gpt-4'
 
